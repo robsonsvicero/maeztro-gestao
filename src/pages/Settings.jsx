@@ -32,7 +32,7 @@ const KIWIFY_CHECKOUTS = {
   annual: 'https://pay.kiwify.com.br/h4t2yde',
 };
 const isAndroidApp = Capacitor.getPlatform() === 'android';
-const SHOW_GOOGLE_CALENDAR_INTEGRATION = false;
+const SHOW_GOOGLE_CALENDAR_INTEGRATION = true; // Set to false to hide the Google Calendar integration section
 
 export default function Settings() {
   const queryClient = useQueryClient();
