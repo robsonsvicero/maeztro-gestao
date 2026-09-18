@@ -30,6 +30,14 @@ export default function Schedule() {
     queryFn: () => base44.entities.Student.list(),
   });
 
+  const { data: appSettings } = useQuery({
+    queryKey: ['appSettings'],
+    queryFn: async () => {
+      const settings = await base44.entities.AppSettings.list();
+      return settings[0] || null;
+    },
+  });
+
   const lessonsWithPaymentStatus = lessons.map((lesson) => {
     const student = students.find((item) => item.id === lesson.student_id);
     if (!student) return lesson;
@@ -154,7 +162,7 @@ export default function Schedule() {
               setEditingLesson(null);
               setPrefilledStartTime(null);
             }}
-            appSettings={settings}
+            appSettings={appSettings}
             defaultDate={selectedDate}
             defaultStartTime={prefilledStartTime}
           />
@@ -199,7 +207,7 @@ export default function Schedule() {
             onStatusChange={handleStatusChange}
             onLessonUpdate={handleLessonUpdate}
             onNewLesson={handleNewLessonAtTime}
-            appSettings={settings}
+            appSettings={appSettings}
             isLoading={isLoading}
           />
         </TabsContent>
