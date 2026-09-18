@@ -8,9 +8,9 @@ export default function LegalDocumentPage({ title, description, sections }) {
     <main className="min-h-screen bg-slate-100 px-4 py-8 dark:bg-slate-950 md:py-12">
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-[#094C7E] hover:underline dark:text-sky-300">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-[#094C7E] hover:underline dark:text-sky-300">
             <ArrowLeft className="h-4 w-4" />
-            Voltar para o login
+            Voltar para a página inicial
           </Link>
           <ShieldCheck className="h-6 w-6 text-[#094C7E] dark:text-sky-300" aria-hidden="true" />
         </div>
