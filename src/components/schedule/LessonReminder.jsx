@@ -62,7 +62,7 @@ export default function LessonReminder() {
   };
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 md:left-auto md:w-[380px]" role="alert" aria-live="assertive">
+    <div className="fixed left-1/2 top-4 z-50 w-[calc(100%-2rem)] max-w-[380px] -translate-x-1/2" role="alert" aria-live="assertive">
       <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-2xl ring-1 ring-amber-100 dark:border-amber-800 dark:bg-slate-800 dark:ring-amber-900/40">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
