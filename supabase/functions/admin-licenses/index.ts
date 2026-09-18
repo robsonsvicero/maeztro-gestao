@@ -66,7 +66,7 @@ Deno.serve(async (request) => {
 
   const [{ data: entitlements, error: entitlementError }, { data: profiles, error: profileError }, { data: events, error: eventError }] = await Promise.all([
     admin.from('entitlements').select('id, auth_user_id, email, access_type, provider, product_id, base_plan_id, status, access_starts_at, access_ends_at, auto_renewing, canceled_at, revoked_at, created_at, updated_at').order('created_at', { ascending: false }),
-    admin.from('profiles').select('id, email, full_name, role').order('email'),
+    admin.from('profiles').select('id, email, full_name, role, legal_documents_version, legal_documents_accepted_at').order('email'),
     admin.from('subscription_events')
       .select('id, event_type, processing_status, processing_error, product_id, base_plan_id, created_at, processed_at')
       .order('created_at', { ascending: false })
@@ -109,6 +109,8 @@ Deno.serve(async (request) => {
     auth_user_id: profile.id,
     first_access_completed: Boolean(authUsersById.get(profile.id)?.last_sign_in_at),
     first_access_at: authUsersById.get(profile.id)?.last_sign_in_at ?? null,
+    legal_documents_version: profile.legal_documents_version,
+    legal_documents_accepted_at: profile.legal_documents_accepted_at,
     entitlements: merged,
     };
   });
@@ -123,6 +125,8 @@ Deno.serve(async (request) => {
         auth_user_id: entitlement.auth_user_id,
         first_access_completed: Boolean(authUsersById.get(entitlement.auth_user_id)?.last_sign_in_at),
         first_access_at: authUsersById.get(entitlement.auth_user_id)?.last_sign_in_at ?? null,
+        legal_documents_version: null,
+        legal_documents_accepted_at: null,
         entitlements: [entitlement],
       });
     }

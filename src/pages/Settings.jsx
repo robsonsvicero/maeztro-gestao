@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
@@ -9,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Image, Upload, Lock, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Image, Upload, Lock, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2, FileText } from "lucide-react";
 import { formatPhone, unformatPhone } from "@/utils/formatUtils";
+import { LEGAL_DOCUMENT_VERSION } from "@/lib/legalDocuments";
 
 const dayLabels = {
   monday: "Segunda-feira",
@@ -40,6 +42,7 @@ export default function Settings() {
   const [billingMessage, setBillingMessage] = useState('');
   const [purchasingPlan, setPurchasingPlan] = useState(null);
   const [isKiwifyCancelDialogOpen, setIsKiwifyCancelDialogOpen] = useState(false);
+  const [legalConsent, setLegalConsent] = useState(null);
   const { data: settings = [], isLoading: _isLoading } = useQuery({
     queryKey: ['appSettings'],
     queryFn: () => base44.entities.AppSettings.list(),
@@ -76,6 +79,22 @@ export default function Settings() {
     };
 
     loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const loadLegalConsent = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('legal_documents_version, legal_documents_accepted_at')
+        .eq('id', user.id)
+        .maybeSingle();
+      setLegalConsent(data || null);
+    };
+
+    loadLegalConsent();
   }, []);
 
   useEffect(() => {
@@ -301,6 +320,33 @@ export default function Settings() {
       </div>
 
       <div className="space-y-6">
+        <Card className="shadow-xl">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-[#094C7E]" />
+              Documentos legais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Consulte os documentos que regulam o uso do MAEZTRO Gestão e o tratamento de dados pessoais.
+            </p>
+            <div className="flex flex-wrap gap-4 text-sm font-medium">
+              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/termos-de-uso" target="_blank">
+                Termos de Uso
+              </Link>
+              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/politica-de-privacidade" target="_blank">
+                Política de Privacidade
+              </Link>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {legalConsent?.legal_documents_accepted_at
+                ? `Aceite registrado em ${new Date(legalConsent.legal_documents_accepted_at).toLocaleString('pt-BR')} (versão ${legalConsent.legal_documents_version || LEGAL_DOCUMENT_VERSION}).`
+                : 'O aceite dos documentos ainda não foi registrado nesta conta.'}
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Informações Gerais */}
         <Card className="shadow-xl">
           <CardHeader className="border-b">
