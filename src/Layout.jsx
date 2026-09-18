@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 import LessonReminder from "@/components/schedule/LessonReminder";
+import LegalConsentGate from "@/components/legal/LegalConsentGate";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,7 +173,8 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
   ];
 
   return (
-    <SidebarProvider>
+    <LegalConsentGate>
+      <SidebarProvider>
       <LessonReminder />
       <style>{`
         @media print {
@@ -408,6 +410,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
           </div>
         </nav>
       </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </LegalConsentGate>
   );
 }

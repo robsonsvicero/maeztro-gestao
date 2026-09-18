@@ -12,6 +12,8 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '@/utils';
 import PublicHome from '@/pages/PublicHome';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import TermsOfUse from '@/pages/TermsOfUse';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -86,21 +88,23 @@ const AuthenticatedApp = () => {
     }
   }
 
-  const publicPaths = ['/', '/login', '/teste-gratis', '/definir-senha', '/primeiro-acesso'];
+  const publicPaths = ['/', '/login', '/teste-gratis', '/definir-senha', '/primeiro-acesso', '/termos-de-uso', '/politica-de-privacidade'];
   if (!isAuthenticated && !publicPaths.includes(location.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
-  if (isAuthenticated && (accessStatus === 'idle' || accessStatus === 'checking') && location.pathname !== '/teste-gratis') {
+  if (isAuthenticated && (accessStatus === 'idle' || accessStatus === 'checking') && !['/teste-gratis', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
     return <AppAccessLoadingScreen />;
   }
 
-  if (isAuthenticated && accessStatus !== 'active' && !['/ativar-acesso', '/teste-gratis', '/definir-senha', '/primeiro-acesso'].includes(location.pathname)) {
+  if (isAuthenticated && accessStatus !== 'active' && !['/ativar-acesso', '/teste-gratis', '/definir-senha', '/primeiro-acesso', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
     return <Navigate to="/ativar-acesso" replace />;
   }
 
   return (
     <Routes>
+      <Route path="/termos-de-uso" element={<TermsOfUse />} />
+      <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
       <Route path="/login" element={<Pages.Login />} />
       <Route path="/teste-gratis" element={<Pages.FreeTrial />} />
       <Route path="/definir-senha" element={<Pages.SetPassword />} />
