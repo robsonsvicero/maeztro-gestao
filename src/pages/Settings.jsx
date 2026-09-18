@@ -320,32 +320,6 @@ export default function Settings() {
       </div>
 
       <div className="space-y-6">
-        <Card className="shadow-xl">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#094C7E]" />
-              Documentos legais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Consulte os documentos que regulam o uso do MAEZTRO Gestão e o tratamento de dados pessoais.
-            </p>
-            <div className="flex flex-wrap gap-4 text-sm font-medium">
-              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/termos-de-uso" target="_blank">
-                Termos de Uso
-              </Link>
-              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/politica-de-privacidade" target="_blank">
-                Política de Privacidade
-              </Link>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {legalConsent?.legal_documents_accepted_at
-                ? `Aceite registrado em ${new Date(legalConsent.legal_documents_accepted_at).toLocaleString('pt-BR')} (versão ${legalConsent.legal_documents_version || LEGAL_DOCUMENT_VERSION}).`
-                : 'O aceite dos documentos ainda não foi registrado nesta conta.'}
-            </p>
-          </CardContent>
-        </Card>
 
         {/* Informações Gerais */}
         <Card className="shadow-xl">
@@ -448,6 +422,34 @@ export default function Settings() {
                 onChange={(e) => setFormData({ ...formData, default_lesson_duration: parseInt(e.target.value) })}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Documentos Legais - LGPD*/}
+        <Card className="shadow-xl">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-[#094C7E]" />
+              Documentos legais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Consulte os documentos que regulam o uso do MAEZTRO Gestão e o tratamento de dados pessoais.
+            </p>
+            <div className="flex flex-wrap gap-4 text-sm font-medium">
+              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/termos-de-uso" target="_blank">
+                Termos de Uso
+              </Link>
+              <Link className="text-[#094C7E] underline hover:text-[#073B60] dark:text-sky-300" to="/politica-de-privacidade" target="_blank">
+                Política de Privacidade
+              </Link>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {legalConsent?.legal_documents_accepted_at
+                ? `Aceite registrado em ${new Date(legalConsent.legal_documents_accepted_at).toLocaleString('pt-BR')} (versão ${legalConsent.legal_documents_version || LEGAL_DOCUMENT_VERSION}).`
+                : 'O aceite dos documentos ainda não foi registrado nesta conta.'}
+            </p>
           </CardContent>
         </Card>
 
@@ -671,7 +673,7 @@ export default function Settings() {
         )}
 
         <div className="flex justify-end">
-          <Button 
+          <Button
             type="button"
             onClick={handleSubmit}
             className="bg-gradient-to-r from-[#094C7E] to-[#0A5A94]"
