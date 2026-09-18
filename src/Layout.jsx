@@ -11,7 +11,6 @@ import {
   Receipt as ReceiptIcon,
   Settings,
   Calendar,
-  Clock,
   Sparkles,
   KeyRound,
   MoreHorizontal,
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
+import LessonReminder from "@/components/schedule/LessonReminder";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -173,6 +173,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
 
   return (
     <SidebarProvider>
+      <LessonReminder />
       <style>{`
         @media print {
           .no-print {
