@@ -11,7 +11,6 @@ import { getPaymentStatus } from "@/utils/paymentUtils";
 
 import ScheduleSuggestions from "../components/schedule/ScheduleSuggestions";
 import StudentSelector from "../components/schedule/StudentSelector";
-import { syncPendingGoogleCalendarLessons } from "@/utils/googleCalendar";
 
 export default function AutoSchedule() {
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -103,14 +102,6 @@ export default function AutoSchedule() {
           }
         });
         if (adminEmailError) console.error("Erro ao enviar email ao admin:", adminEmailError);
-      }
-
-      if (settings.sync_with_google_calendar && settings.google_calendar_email) {
-        try {
-          await syncPendingGoogleCalendarLessons();
-        } catch (calendarError) {
-          console.error("Erro ao sincronizar aula com Google Calendar:", calendarError);
-        }
       }
 
       return lesson;

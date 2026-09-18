@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarCheck } from "lucide-react";
 import { getPaymentStatus } from "@/utils/paymentUtils";
 
 export default function LessonForm({ lesson, students, onSubmit, onCancel, theme, appSettings, defaultDate, defaultStartTime }) {
@@ -76,19 +75,8 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
   const labelClass = theme === 'dark' ? 'text-slate-200' : '';
   const inputClass = theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100' : '';
 
-  const syncEnabled = appSettings?.sync_with_google_calendar && appSettings?.google_calendar_email;
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {syncEnabled && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-          <CalendarCheck className="w-4 h-4 text-blue-600" />
-          <span className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
-            Esta aula será adicionada automaticamente ao Google Calendar
-          </span>
-        </div>
-      )}
-
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="student" className={labelClass}>Aluno *</Label>

@@ -9,8 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Settings as SettingsIcon, Image, Upload, Lock, CalendarCheck, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Image, Upload, Lock, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2 } from "lucide-react";
 import { formatPhone, unformatPhone } from "@/utils/formatUtils";
 
 const dayLabels = {
@@ -32,8 +31,6 @@ const KIWIFY_CHECKOUTS = {
   annual: 'https://pay.kiwify.com.br/h4t2yde',
 };
 const isAndroidApp = Capacitor.getPlatform() === 'android';
-const SHOW_GOOGLE_CALENDAR_INTEGRATION = false; // Set to true to display the Google Calendar integration section
-
 export default function Settings() {
   const queryClient = useQueryClient();
   const { accessType, accessProvider, accessStatus, accessEndsAt } = useAuth();
@@ -43,8 +40,6 @@ export default function Settings() {
   const [billingMessage, setBillingMessage] = useState('');
   const [purchasingPlan, setPurchasingPlan] = useState(null);
   const [isKiwifyCancelDialogOpen, setIsKiwifyCancelDialogOpen] = useState(false);
-  const [isConnectingGoogleCalendar, setIsConnectingGoogleCalendar] = useState(false);
-
   const { data: settings = [], isLoading: _isLoading } = useQuery({
     queryKey: ['appSettings'],
     queryFn: () => base44.entities.AppSettings.list(),
@@ -53,8 +48,6 @@ export default function Settings() {
   const [formData, setFormData] = useState({
     professional_name: "",
     logo_url: "",
-    google_calendar_email: "",
-    sync_with_google_calendar: false,
     teacher_phone: "",
     cpf_cnpj: "",
     default_lesson_duration: 60,
@@ -90,8 +83,6 @@ export default function Settings() {
       setFormData({
         professional_name: settings[0].professional_name || "",
         logo_url: settings[0].logo_url || "",
-        google_calendar_email: settings[0].google_calendar_email || "",
-        sync_with_google_calendar: settings[0].sync_with_google_calendar || false,
         teacher_phone: settings[0].teacher_phone || "",
         cpf_cnpj: settings[0].cpf_cnpj || "",
         default_lesson_duration: settings[0].default_lesson_duration || 60,
@@ -213,11 +204,6 @@ export default function Settings() {
     onSuccess: (savedSettings) => {
       setSaveFeedback({ type: "success", message: "Configurações salvas com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ['appSettings'] });
-      if (formData.sync_with_google_calendar && formData.google_calendar_email) {
-        supabase.functions.invoke('sync-google-calendar').then(({ error }) => {
-          if (error) console.error('Erro ao sincronizar aulas existentes:', error);
-        });
-      }
       window.dispatchEvent(new CustomEvent('app-settings-updated', {
         detail: savedSettings || formData,
       }));
@@ -231,18 +217,6 @@ export default function Settings() {
   const handleSubmit = (e) => {
     e.preventDefault();
     updateMutation.mutate(formData);
-  };
-
-  const connectGoogleCalendar = async () => {
-    setIsConnectingGoogleCalendar(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-oauth-start');
-      if (error || !data?.url) throw error || new Error('Não foi possível iniciar a autorização do Google.');
-      window.location.assign(data.url);
-    } catch (error) {
-      setSaveFeedback({ type: 'error', message: error.message || 'Não foi possível conectar o Google Calendar.' });
-      setIsConnectingGoogleCalendar(false);
-    }
   };
 
   const addTimeSlot = (day) => {
@@ -559,63 +533,6 @@ export default function Settings() {
             ))}
           </CardContent>
         </Card>
-
-        {SHOW_GOOGLE_CALENDAR_INTEGRATION && (
-          <Card className="shadow-xl">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarCheck className="w-5 h-5 text-[#094C7E]" />
-              Integração com Google Calendar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="space-y-1">
-                <Label>
-                  Sincronizar com Google Calendar
-                </Label>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Aulas agendadas serão automaticamente adicionadas ao Google Calendar
-                </p>
-              </div>
-              <Switch
-                checked={formData.sync_with_google_calendar}
-                onCheckedChange={(checked) => 
-                  setFormData({ ...formData, sync_with_google_calendar: checked })
-                }
-              />
-            </div>
-            
-            {formData.sync_with_google_calendar && (
-              <div className="space-y-2">
-                <Label htmlFor="google_calendar_email">
-                  Email do Google Calendar *
-                </Label>
-                <Input
-                  id="google_calendar_email"
-                  type="email"
-                  value={formData.google_calendar_email}
-                  onChange={(e) => setFormData({ ...formData, google_calendar_email: e.target.value })}
-                  placeholder="seuemail@gmail.com"
-                  required={formData.sync_with_google_calendar}
-                />
-                <p className="text-sm text-slate-500">
-                  Conecte sua conta para autorizar o sistema sem compartilhar o calendário manualmente.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={connectGoogleCalendar}
-                  disabled={isConnectingGoogleCalendar}
-                >
-                  <CalendarCheck className="w-4 h-4" />
-                  {isConnectingGoogleCalendar ? 'Conectando...' : 'Conectar Google Calendar'}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-          </Card>
-        )}
 
         <Card className="shadow-xl">
           <CardHeader className="border-b">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import LessonForm from "../components/schedule/LessonForm";
 import CalendarView from "../components/schedule/CalendarView";
 import ListView from "../components/schedule/ListView";
 import DayView from "../components/schedule/DayView";
-import { syncPendingGoogleCalendarLessons } from "@/utils/googleCalendar";
 
 export default function Schedule() {
   const [showForm, setShowForm] = useState(false);
@@ -31,21 +30,6 @@ export default function Schedule() {
     queryFn: () => base44.entities.Student.list(),
   });
 
-  const { data: appSettings = [] } = useQuery({
-    queryKey: ['appSettings'],
-    queryFn: () => base44.entities.AppSettings.list(),
-  });
-
-  const settings = appSettings[0] || {};
-
-  useEffect(() => {
-    if (!settings.sync_with_google_calendar || !settings.google_calendar_email) return;
-
-    syncPendingGoogleCalendarLessons().catch((error) => {
-      console.error("Error syncing pending lessons with Google Calendar:", error);
-    });
-  }, [settings.sync_with_google_calendar, settings.google_calendar_email]);
-
   const lessonsWithPaymentStatus = lessons.map((lesson) => {
     const student = students.find((item) => item.id === lesson.student_id);
     if (!student) return lesson;
@@ -59,16 +43,6 @@ export default function Schedule() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const lesson = await base44.entities.Lesson.create(data);
-      
-      // Sync with Google Calendar if enabled
-      if (settings.sync_with_google_calendar && settings.google_calendar_email) {
-        try {
-          await syncPendingGoogleCalendarLessons();
-        } catch (error) {
-          console.error("Error syncing with Google Calendar:", error);
-        }
-      }
-      
       return lesson;
     },
     onSuccess: () => {

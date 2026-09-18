@@ -58,8 +58,6 @@ create table if not exists public.app_settings (
   id uuid primary key default gen_random_uuid(),
   professional_name text not null default 'Nome do profissional',
   logo_url text,
-  google_calendar_email text,
-  sync_with_google_calendar boolean not null default false,
   admin_email text,
   teacher_phone text,
   default_lesson_duration integer not null default 60,
@@ -255,8 +253,6 @@ Exemplo de configuração inicial do sistema:
 insert into public.app_settings (
   professional_name,
   logo_url,
-  google_calendar_email,
-  sync_with_google_calendar,
   admin_email,
   teacher_phone,
   default_lesson_duration,
@@ -264,8 +260,6 @@ insert into public.app_settings (
 ) values (
   'Nome do profissional',
   '',
-  'admin@exemplo.com',
-  false,
   'admin@exemplo.com',
   '(11) 99999-9999',
   60,
