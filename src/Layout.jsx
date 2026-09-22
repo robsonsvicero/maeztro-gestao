@@ -14,9 +14,7 @@ import {
   Sparkles,
   KeyRound,
   MoreHorizontal,
-  Power,
-  Moon,
-  Sun
+  Power
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +31,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { ThemeSwitch } from "@/components/ui/theme-switch";
 import { useAuth } from "@/lib/AuthContext";
 import LessonReminder from "@/components/schedule/LessonReminder";
 import LegalConsentGate from "@/components/legal/LegalConsentGate";
@@ -42,26 +41,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/lib/ThemeContext";
-
-function ThemeToggle({ className = '' }) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === 'dark';
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      type="button"
-      aria-label={isDark ? 'Ativar tema claro' : 'Ativar tema escuro'}
-      title={isDark ? 'Ativar tema claro' : 'Ativar tema escuro'}
-      className={`text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50 ${className}`}
-      onClick={toggleTheme}
-    >
-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-    </Button>
-  );
-}
 
 const navigationItems = [
   { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
@@ -326,7 +305,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
 
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="hidden items-center justify-end border-b border-slate-200 bg-white px-6 py-2 dark:border-slate-800 dark:bg-slate-900 lg:flex no-print">
-            <ThemeToggle />
+            <ThemeSwitch />
           </header>
           <header className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 lg:hidden no-print">
             <div className="flex items-center justify-between gap-3">
