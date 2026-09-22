@@ -162,6 +162,12 @@ button:focus-visible {
   }
 }
 
+@layer utilities {
+  [class*="from-[#094C7E]"] {
+    color: white;
+  }
+}
+
 
 
 @layer base {

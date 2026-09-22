@@ -4,6 +4,7 @@ import { ArrowUpRight, ArrowDownRight, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTheme } from "@/lib/ThemeContext";
 
 const categoryLabels = {
   general: "Geral",
@@ -23,13 +24,15 @@ const categoryLabels = {
   other: "Outros"
 };
 
-export default function RecentTransactions({ transactions, isLoading, theme }) {
+export default function RecentTransactions({ transactions, isLoading }) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   if (isLoading) {
     return (
       <Card className={`backdrop-blur-xl shadow-xl ${
-        theme === 'dark' ? 'bg-slate-800/60 border-slate-700' : 'bg-white/60 border-slate-200'
+        isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
       }`}>
-        <CardHeader className={`border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-[#094C7E]" />
             Transações Recentes
@@ -49,11 +52,11 @@ export default function RecentTransactions({ transactions, isLoading, theme }) {
 
   return (
     <Card className={`backdrop-blur-xl shadow-xl ${
-      theme === 'dark' ? 'bg-slate-800/60 border-slate-700' : 'bg-white/60 border-slate-200'
+      isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
     }`}>
-      <CardHeader className={`border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+      <CardHeader className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
         <CardTitle className={`flex items-center gap-2 ${
-          theme === 'dark' ? 'text-slate-100' : 'text-slate-900'
+          isDark ? 'text-slate-100' : 'text-slate-900'
         }`}>
           <Clock className="w-5 h-5 text-[#094C7E]" />
           Transações Recentes
@@ -62,7 +65,7 @@ export default function RecentTransactions({ transactions, isLoading, theme }) {
       <CardContent className="p-6">
         <div className="space-y-4">
           {transactions.length === 0 ? (
-            <p className={`text-center py-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Nenhuma transação registrada
             </p>
           ) : (
@@ -70,7 +73,7 @@ export default function RecentTransactions({ transactions, isLoading, theme }) {
               <div 
                 key={transaction.id} 
                 className={`flex items-center justify-between py-4 border-b last:border-0 rounded-lg px-3 transition-colors ${
-                  theme === 'dark' 
+                    isDark
                     ? 'border-slate-700 hover:bg-slate-700/50' 
                     : 'border-slate-100 hover:bg-slate-50'
                 }`}
@@ -88,14 +91,14 @@ export default function RecentTransactions({ transactions, isLoading, theme }) {
                     )}
                   </div>
                   <div>
-                    <p className={`font-semibold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                    <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                       {transaction.description}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">
                         {categoryLabels[transaction.category] || transaction.category || "Sem categoria"}
                       </Badge>
-                      <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {format(new Date(transaction.date), "d 'de' MMMM", { locale: ptBR })}
                       </span>
                     </div>
