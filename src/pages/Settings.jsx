@@ -10,9 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Image, Upload, Lock, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2, FileText } from "lucide-react";
+import { Settings as SettingsIcon, Image, Upload, Lock, CreditCard, XCircle, Eye, EyeOff, Clock, Plus, Trash2, FileText, Moon, Sun } from "lucide-react";
 import { formatPhone, unformatPhone } from "@/utils/formatUtils";
 import { LEGAL_DOCUMENT_VERSION } from "@/lib/legalDocuments";
+import { useTheme } from "@/lib/ThemeContext";
 
 const dayLabels = {
   monday: "Segunda-feira",
@@ -36,6 +37,7 @@ const isAndroidApp = Capacitor.getPlatform() === 'android';
 export default function Settings() {
   const queryClient = useQueryClient();
   const { accessType, accessProvider, accessStatus, accessEndsAt } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [uploading, setUploading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [billingAvailable, setBillingAvailable] = useState(false);
@@ -310,13 +312,25 @@ export default function Settings() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">
-          Configurações
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          Gerencie as configurações do aplicativo
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">
+            Configurações
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400">
+            Gerencie as configurações do aplicativo
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0 lg:hidden"
+          aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          <span>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+        </Button>
       </div>
 
       <div className="space-y-6">
