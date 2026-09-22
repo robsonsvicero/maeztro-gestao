@@ -36,7 +36,7 @@ export default function StudentCard({
   };
 
   return (
-    <Card className="overflow-hidden border-slate-200 bg-white shadow-lg transition-all hover:shadow-xl dark:border-slate-600 dark:bg-slate-800">
+    <Card className="flex h-full flex-col overflow-hidden border-slate-200 bg-white shadow-lg transition-all hover:shadow-xl dark:border-slate-600 dark:bg-slate-800">
       <div className="bg-gradient-to-r from-[#094C7E] to-[#0A5A94] p-4 text-white">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -61,7 +61,7 @@ export default function StudentCard({
         </div>
       </div>
 
-      <div className="space-y-3 p-4 text-sm text-slate-700 dark:text-slate-200">
+      <div className="flex-1 space-y-3 p-4 text-sm text-slate-700 dark:text-slate-200">
         {(student.monthly_payment || student.weekly_payment) && (
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#094C7E] dark:text-sky-300">
@@ -131,7 +131,7 @@ export default function StudentCard({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-900/60">
+      <div className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-900/60">
         {isInactive ? (
           <Button variant="outline" size="sm" onClick={onEdit} className="col-span-2 w-full min-w-0 border-slate-300 bg-white px-2 text-slate-700 hover:bg-slate-100 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
             <Pencil className="mr-1.5 h-4 w-4 shrink-0" />
