@@ -178,3 +178,9 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+.eyebrow {
+  font-size: 0.75em;
+  color: #00000070;
+  margin-top: 1rem;
+}
