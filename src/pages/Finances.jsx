@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowDown, ArrowUp, ArrowUpDown, FileDown, Plus, Search, PencilLine, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, FileDown, Plus, Search, PencilLine, Trash2 } from "lucide-react";
 import { getLocalDateString, parseLocalDate } from "@/utils/dateUtils";
 import { getNextPaymentDate } from "@/utils/paymentUtils";
 
@@ -52,6 +52,7 @@ export default function Finances() {
   const [startDate, setStartDate] = useState(() => getDateDaysAgo(6));
   const [endDate, setEndDate] = useState(() => getTodayDate());
   const [searchTerm, setSearchTerm] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(() => window.innerWidth >= 768);
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   const queryClient = useQueryClient();
 
@@ -368,7 +369,17 @@ export default function Finances() {
       </div>
 
       <Card className="w-full p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 text-left md:hidden"
+          onClick={() => setIsFiltersOpen((current) => !current)}
+          aria-expanded={isFiltersOpen}
+          aria-controls="finance-filters"
+        >
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Filtros</span>
+          <ChevronDown className={`h-5 w-5 text-slate-500 transition-transform ${isFiltersOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <div id="finance-filters" className={`${isFiltersOpen ? 'grid' : 'hidden'} mt-4 gap-4 md:mt-0 md:grid md:grid-cols-2 xl:grid-cols-4`}>
           <div className="space-y-2">
             <Label htmlFor="finance-month">Mês</Label>
             <Input id="finance-month" type="month" value={selectedMonth} onChange={(event) => handleMonthChange(event.target.value)} />

@@ -197,7 +197,12 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
               <img
                 src="/logo_horizontal.png"
                 alt="Logo MAEZTRO"
-                className="h-11 shrink-0 rounded-full object-contain"
+                className="h-11 shrink-0 rounded-full object-contain group-data-[collapsible=icon]:hidden"
+              />
+              <img
+                src="/logo_maeztro.webp"
+                alt="Logo MAEZTRO"
+                className="hidden h-9 w-9 shrink-0 rounded-full object-contain group-data-[collapsible=icon]:block"
               />
               
               <SidebarTrigger className="h-8 w-8 shrink-0 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50" />
