@@ -195,13 +195,11 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
           <SidebarHeader className="border-b border-slate-200 dark:border-slate-800 p-3">
             <div className="flex min-w-0 items-center gap-2">
               <img
-                src="/logo_maeztro.webp"
+                src="/logo_horizontal.png"
                 alt="Logo MAEZTRO"
-                className="h-11 w-11 shrink-0 rounded-full object-contain"
+                className="h-11 shrink-0 rounded-full object-contain"
               />
-              <span className="min-w-0 flex-1 truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-                MAEZTRO Gestão
-              </span>
+              
               <SidebarTrigger className="h-8 w-8 shrink-0 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50" />
             </div>
           </SidebarHeader>
