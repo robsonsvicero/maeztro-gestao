@@ -43,8 +43,7 @@ export default function PublicHome() {
       <header className="border-b border-slate-200/80 bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <div className="flex items-center gap-3">
-            <img src="/logo_maeztro.webp" alt="MAEZTRO Gestão" className="h-11 w-11 object-contain" />
-            <span className="text-lg font-semibold tracking-tight">MAEZTRO Gestão</span>
+            <img src="/logo_horizontal.png" alt="MAEZTRO Gestão" className="h-12 object-contain" />
           </div>
           <Button asChild variant="outline">
             <Link to="/login"><LogIn className="h-4 w-4" /> Entrar</Link>
@@ -72,7 +71,7 @@ export default function PublicHome() {
           <p className="mt-4 text-sm text-slate-500">Teste grátis por 14 dias. Sem cartão.</p>
         </div>
         <div className="rounded-[2rem] border border-[#bfd3e2] bg-[#e2edf5] p-8 shadow-sm">
-          <img src="/logo_maeztro.webp" alt="MAEZTRO Gestão" className="mx-auto h-40 w-40 object-contain" />
+          <img src="/logo_vertical.png" alt="MAEZTRO Gestão" className="mx-auto h-40 w-40 object-contain" />
           <p className="mt-6 text-center text-xl font-medium text-[#123F63]">
             Mais tempo para ensinar. Mais clareza para administrar.
           </p>

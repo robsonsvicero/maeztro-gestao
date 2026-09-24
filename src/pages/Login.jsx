@@ -121,5 +121,35 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
-  return <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-12 dark:bg-slate-950"><div className="w-full max-w-md"><div className="mb-6 flex justify-center"><img src="/logo_horizontal.png" alt="MAEZTRO" className="h-24 w-auto object-contain" /></div><Card className="w-full border-slate-200 shadow-lg dark:border-slate-800"><CardHeader className="space-y-2"><CardTitle className="text-2xl font-bold">{isRecoveryMode ? 'Recuperar senha' : 'Entrar'}</CardTitle><CardDescription>{isRecoveryMode ? 'Informe seu e-mail para receber as instruções de recuperação.' : 'Use o mesmo e-mail da sua conta MAEZTRO.'}</CardDescription></CardHeader><CardContent><form className="space-y-4" onSubmit={submit}><div className="space-y-2"><Label htmlFor="email">E-mail</Label><Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>{!isRecoveryMode && <div className="space-y-2"><Label htmlFor="password">Senha</Label><div className="relative"><Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button></div></div>}{error && <p className="text-sm text-red-600">{error}</p>}{message && <p className="text-sm text-green-600">{message}</p>}<Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Aguarde...' : isRecoveryMode ? 'Enviar instruções' : 'Entrar'}</Button><button type="button" className="w-full text-sm font-medium text-[#094C7E] hover:underline" onClick={() => { setIsRecoveryMode((current) => !current); setError(''); setMessage(''); }}>{isRecoveryMode ? 'Voltar para o login' : 'Esqueci minha senha'}</button>{!isRecoveryMode && <button type="button" className="w-full text-sm font-medium text-[#094C7E] hover:underline" onClick={() => navigate('/primeiro-acesso')}>1º acesso — criar minha senha</button>}</form></CardContent></Card></div></div>;
+  return (
+    <main className="flex min-h-screen bg-white">
+      <section className="flex w-full items-center justify-center px-6 py-12 sm:px-12 lg:w-[28%] lg:min-w-[440px] lg:px-14">
+        <div className="w-full max-w-[328px]">
+          <div className="mb-14 flex justify-center">
+            <img src="/logo_maeztro_login.png" alt="MAEZTRO Gestão" className="h-auto w-full max-w-[235px] object-contain" />
+          </div>
+          <Card className="w-full border-0 shadow-none">
+            <CardHeader className="space-y-1 p-0">
+              <CardTitle className="text-xl font-bold text-slate-950">{isRecoveryMode ? 'Recuperar senha' : 'Login'}</CardTitle>
+              <CardDescription className="text-xs text-slate-400">{isRecoveryMode ? 'Informe seu e-mail para receber as instruções de recuperação.' : 'Use o mesmo e-mail da sua conta MAEZTRO.'}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 pt-5">
+              <form className="space-y-3" onSubmit={submit}>
+                <div className="space-y-1.5"><Label htmlFor="email" className="text-xs font-medium text-slate-800">E-mail</Label><Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 text-xs shadow-none" /></div>
+                {!isRecoveryMode && <div className="space-y-1.5"><Label htmlFor="password" className="text-xs font-medium text-slate-800">Senha</Label><div className="relative"><Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 pr-10 text-xs shadow-none" /><Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-[30px] w-8 px-2 text-slate-700 hover:bg-transparent" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div>}
+                {error && <p className="text-xs text-red-600">{error}</p>}
+                {message && <p className="text-xs text-green-600">{message}</p>}
+                <Button type="submit" className="h-[30px] w-full rounded-md bg-[#151515] text-xs font-normal text-white shadow-sm hover:bg-black" disabled={isSubmitting}>{isSubmitting ? 'Aguarde...' : isRecoveryMode ? 'Enviar instruções' : 'Entrar'}</Button>
+                <button type="button" className="w-full pt-1 text-xs font-medium text-[#24618b] hover:underline" onClick={() => { setIsRecoveryMode((current) => !current); setError(''); setMessage(''); }}>{isRecoveryMode ? 'Voltar para o login' : 'Esqueci minha senha'}</button>
+                {!isRecoveryMode && <button type="button" className="w-full text-xs font-medium text-[#24618b] hover:underline" onClick={() => navigate('/primeiro-acesso')}>1º acesso — criar minha senha</button>}
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+      <aside className="hidden flex-1 bg-[#214a70] lg:block">
+        <img src="/banner_login.png" alt="" className="h-full min-h-screen w-full object-cover object-center" />
+      </aside>
+    </main>
+  );
 }
