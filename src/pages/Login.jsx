@@ -128,7 +128,7 @@ export default function Login() {
           <div className="mb-14 flex justify-center">
             <img src="/logo_maeztro_login.png" alt="MAEZTRO Gestão" className="h-auto w-full max-w-[235px] object-contain" />
           </div>
-          <Card className="w-full border-0 shadow-none">
+          <Card className="bg-white w-full border-0 shadow-none">
             <CardHeader className="space-y-1 p-0">
               <CardTitle className="text-xl font-bold text-slate-950">{isRecoveryMode ? 'Recuperar senha' : 'Login'}</CardTitle>
               <CardDescription className="text-xs text-slate-400">{isRecoveryMode ? 'Informe seu e-mail para receber as instruções de recuperação.' : 'Use o mesmo e-mail da sua conta MAEZTRO.'}</CardDescription>
