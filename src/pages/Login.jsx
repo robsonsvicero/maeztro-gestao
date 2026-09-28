@@ -133,10 +133,23 @@ export default function Login() {
               <CardTitle className="text-xl font-bold text-slate-950">{isRecoveryMode ? 'Recuperar senha' : 'Login'}</CardTitle>
               <CardDescription className="text-xs text-slate-400">{isRecoveryMode ? 'Informe seu e-mail para receber as instruções de recuperação.' : 'Use o mesmo e-mail da sua conta MAEZTRO.'}</CardDescription>
             </CardHeader>
-            <CardContent className="p-0 pt-5">
+            <CardContent className="bg-white p-0 pt-5">
               <form className="space-y-3" onSubmit={submit}>
-                <div className="space-y-1.5"><Label htmlFor="email" className="text-xs font-medium text-slate-800">E-mail</Label><Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 text-xs shadow-none" /></div>
-                {!isRecoveryMode && <div className="space-y-1.5"><Label htmlFor="password" className="text-xs font-medium text-slate-800">Senha</Label><div className="relative"><Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 pr-10 text-xs shadow-none" /><Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-[30px] w-8 px-2 text-slate-700 hover:bg-transparent" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</Button></div></div>}
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-medium text-slate-800">E-mail</Label>
+                  <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 text-xs shadow-none" />
+                </div>
+                {!isRecoveryMode &&
+                  <div className="space-y-1.5">
+                    <Label htmlFor="password" className="text-xs font-medium text-slate-800">
+                      Senha
+                    </Label>
+                    <div className="relative">
+                      <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="h-[30px] rounded-md border-slate-200 px-2.5 pr-10 text-xs shadow-none" />
+                      <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-[30px] w-8 px-2 text-slate-700 hover:bg-transparent" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  </div>}
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 {message && <p className="text-xs text-green-600">{message}</p>}
                 <Button type="submit" className="h-[30px] w-full rounded-md bg-[#151515] text-xs font-normal text-white shadow-sm hover:bg-black" disabled={isSubmitting}>{isSubmitting ? 'Aguarde...' : isRecoveryMode ? 'Enviar instruções' : 'Entrar'}</Button>
