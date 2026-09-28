@@ -184,3 +184,10 @@ button:focus-visible {
   color: #00000070;
   margin-top: 1rem;
 }
+
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+}
