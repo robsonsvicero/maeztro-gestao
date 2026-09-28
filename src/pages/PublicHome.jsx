@@ -45,7 +45,7 @@ export default function PublicHome() {
           <div className="flex items-center gap-3">
             <img src="/logo_horizontal.png" alt="MAEZTRO Gestão" className="h-12 object-contain" />
           </div>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="bg-white text-[#094C7E] hover:bg-[#094c7e] hover:text-white">
             <Link to="/login"><LogIn className="h-4 w-4" /> Entrar</Link>
           </Button>
         </div>
