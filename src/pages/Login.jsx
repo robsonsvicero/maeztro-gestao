@@ -145,7 +145,7 @@ export default function Login() {
                       Senha
                     </Label>
                     <div className="relative">
-                      <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="focus:bg-white focus:text-slate-800 h-[30px] rounded-md border-slate-200 px-2.5 pr-10 text-xs shadow-none" />
+                      <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required className="focus-visible:bg-white focus-visible:text-slate-800 h-[30px] rounded-md border-slate-200 px-2.5 pr-10 text-xs shadow-none" />
                       <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-[30px] w-8 px-2 text-slate-700 hover:bg-transparent" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
