@@ -9,6 +9,7 @@ import { lessonService } from "@/modules/lessons/services/lessonService";
 import { appSettingsService } from "@/modules/settings/services/settingsService";
 import { studentService } from "@/modules/students/services/studentService";
 import { automationService } from "@/modules/automations/automationService";
+import { availabilityService } from "@/modules/availability/services/availabilityService";
 import { crmTrialService } from "@/modules/crm/services/crmService";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -18,7 +19,7 @@ import ListView from "../components/schedule/ListView";
 import DayView from "../components/schedule/DayView";
 
 export default function Schedule() {
-  const { activeWorkspaceId, workspaceRole, userId } = useAuth();
+  const { activeWorkspaceId, accountType, workspaceRole, userId } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -42,6 +43,18 @@ export default function Schedule() {
       const settings = await appSettingsService.list();
       return settings[0] || null;
     },
+  });
+
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
 
   const { data: teachers = [] } = useQuery({
@@ -72,6 +85,21 @@ export default function Schedule() {
       ? event.date >= todayLocalDate
       : event.date === selectedLocalDate
   ));
+  const studioDayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const scheduleSettings = accountType === 'studio'
+    ? {
+      ...appSettings,
+      available_hours: (studioAvailabilityQuery.data || []).reduce((hours, row) => {
+        const day = studioDayNames[Number(row.weekday)];
+        if (!day) return hours;
+        hours[day] = [...(hours[day] || []), {
+          start: row.start_time.slice(0, 5),
+          end: row.end_time.slice(0, 5),
+        }];
+        return hours;
+      }, {}),
+    }
+    : appSettings;
 
   const lessonsWithPaymentStatus = lessons.map((lesson) => {
     const student = students.find((item) => item.id === lesson.student_id);
@@ -161,6 +189,13 @@ export default function Schedule() {
             Gerencie suas aulas e horários
           </p>
         </div>
+        {(studioAvailabilityQuery.error || teacherAvailabilityQuery.error) && (
+          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+            Não foi possível carregar as disponibilidades: {
+              studioAvailabilityQuery.error?.message || teacherAvailabilityQuery.error?.message
+            }
+          </p>
+        )}
         <Button 
           onClick={() => {
             setEditingLesson(null);
@@ -198,6 +233,10 @@ export default function Schedule() {
               setPrefilledStartTime(null);
             }}
             appSettings={appSettings}
+            accountType={accountType}
+            studioAvailability={studioAvailabilityQuery.data || []}
+            teacherAvailability={teacherAvailabilityQuery.data || []}
+            isAvailabilityLoading={studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading}
             defaultDate={selectedDate}
             defaultStartTime={prefilledStartTime}
           />
@@ -242,7 +281,7 @@ export default function Schedule() {
             onStatusChange={handleStatusChange}
             onLessonUpdate={handleLessonUpdate}
             onNewLesson={handleNewLessonAtTime}
-            appSettings={appSettings}
+            appSettings={scheduleSettings}
             isLoading={isLoading}
           />
         </TabsContent>

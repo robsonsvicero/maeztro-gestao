@@ -1,4 +1,4 @@
--- Allows active Studio members to edit only shared professional and schedule settings.
+-- Allows active Studio members to edit only shared professional settings.
 -- Run after workspaces.sql and account_types.sql.
 begin;
 
@@ -17,8 +17,7 @@ create or replace function public.update_studio_member_settings(
   new_professional_name text,
   new_teacher_phone text,
   new_logo_url text,
-  new_default_lesson_duration integer,
-  new_available_hours jsonb
+  new_default_lesson_duration integer
 )
 returns public.app_settings
 language plpgsql
@@ -52,16 +51,11 @@ begin
     raise exception 'A duração padrão deve estar entre 1 e 480 minutos.';
   end if;
 
-  if jsonb_typeof(new_available_hours) <> 'object' then
-    raise exception 'Os horários disponíveis estão em formato inválido.';
-  end if;
-
   update public.app_settings
   set professional_name = nullif(btrim(new_professional_name), ''),
       teacher_phone = nullif(btrim(new_teacher_phone), ''),
       logo_url = nullif(btrim(new_logo_url), ''),
-      default_lesson_duration = new_default_lesson_duration,
-      available_hours = new_available_hours
+      default_lesson_duration = new_default_lesson_duration
   where workspace_id = target_workspace_id
   returning * into updated_settings;
 
@@ -73,7 +67,7 @@ begin
 end;
 $$;
 
-revoke all on function public.update_studio_member_settings(uuid, text, text, text, integer, jsonb) from public, anon;
-grant execute on function public.update_studio_member_settings(uuid, text, text, text, integer, jsonb) to authenticated;
+revoke all on function public.update_studio_member_settings(uuid, text, text, text, integer) from public, anon;
+grant execute on function public.update_studio_member_settings(uuid, text, text, text, integer) to authenticated;
 
 commit;

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getPaymentStatus } from "@/utils/paymentUtils";
+import { slotFitsAvailability } from "@/modules/availability/availabilityUtils";
 
 export default function LessonForm({
   lesson,
@@ -12,10 +13,14 @@ export default function LessonForm({
   teachers = [],
   currentUserId,
   workspaceRole,
+  accountType,
   onSubmit,
   onCancel,
   theme,
   appSettings,
+  studioAvailability = [],
+  teacherAvailability = [],
+  isAvailabilityLoading = false,
   defaultDate,
   defaultStartTime,
 }) {
@@ -53,6 +58,7 @@ export default function LessonForm({
     notes: "",
     payment_status: "pending"
   });
+  const [availabilityError, setAvailabilityError] = useState('');
 
   const selectedStudent = students.find((student) => student.id === formData.student_id);
   const calculatedPaymentStatus = selectedStudent
@@ -84,6 +90,41 @@ export default function LessonForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setAvailabilityError('');
+
+    const scheduleChanged = !lesson
+      || formData.date !== lesson.date
+      || formData.start_time !== lesson.start_time
+      || formData.end_time !== lesson.end_time
+      || formData.teacher_user_id !== lesson.teacher_user_id
+      || formData.status !== lesson.status;
+    if (accountType === 'studio' && formData.status !== 'cancelled' && scheduleChanged) {
+      if (isAvailabilityLoading) {
+        setAvailabilityError('Aguarde o carregamento dos horários antes de agendar.');
+        return;
+      }
+      if (!formData.teacher_user_id) {
+        setAvailabilityError('Selecione o professor responsável para verificar a disponibilidade.');
+        return;
+      }
+
+      const date = new Date(`${formData.date}T12:00:00`);
+      const slot = {
+        weekday: date.getDay(),
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+      };
+      if (!slotFitsAvailability(slot, studioAvailability)) {
+        setAvailabilityError('Esse horário está fora do funcionamento do estúdio.');
+        return;
+      }
+      const teacherRows = teacherAvailability.filter((row) => row.teacher_user_id === formData.teacher_user_id);
+      if (!slotFitsAvailability(slot, teacherRows)) {
+        setAvailabilityError('Esse horário está fora da disponibilidade cadastrada para o professor.');
+        return;
+      }
+    }
+
     onSubmit({
       ...formData,
       payment_status: calculatedPaymentStatus,
@@ -282,6 +323,12 @@ export default function LessonForm({
           className={inputClass}
         />
       </div>
+
+      {availabilityError && (
+        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          {availabilityError}
+        </p>
+      )}
 
       <div className="flex gap-3 justify-end">
         <Button type="button" variant="outline" onClick={onCancel}>

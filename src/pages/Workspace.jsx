@@ -4,11 +4,13 @@ import { Building2, Copy, Plus, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AvailabilityEditor from '@/components/availability/AvailabilityEditor';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { availabilityService } from '@/modules/availability/services/availabilityService';
 import { workspaceService } from '@/modules/workspaces/services/workspaceService';
 
 const roleLabels = {
@@ -24,6 +26,7 @@ export default function Workspace() {
   const {
     activeWorkspace,
     activeWorkspaceId,
+    accountType,
     userId,
     workspaces,
     workspaceRole,
@@ -51,6 +54,22 @@ export default function Workspace() {
     queryKey: ['workspaceInvitations', activeWorkspaceId],
     queryFn: () => workspaceService.listInvitations(activeWorkspaceId),
     enabled: isOwner && Boolean(activeWorkspaceId),
+  });
+
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: isOwner && accountType === 'studio' && Boolean(activeWorkspaceId),
+  });
+
+  const saveStudioAvailabilityMutation = useMutation({
+    mutationFn: (rows) => availabilityService.saveStudio(activeWorkspaceId, rows),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['studioAvailability', activeWorkspaceId] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboardIntelligence', activeWorkspaceId] });
+      toast.success('Horários do estúdio salvos.');
+    },
+    onError: (error) => toast.error(error.message || 'Não foi possível salvar os horários do estúdio.'),
   });
 
   const refreshWorkspaceData = () => Promise.all([
@@ -178,6 +197,26 @@ export default function Workspace() {
 
       {isOwner ? (
         <>
+          {accountType === 'studio' && (
+            <div className="space-y-3">
+              {studioAvailabilityQuery.error && (
+                <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                  Não foi possível carregar os horários do estúdio: {studioAvailabilityQuery.error.message}
+                </p>
+              )}
+              <AvailabilityEditor
+                title="Horários de funcionamento do estúdio"
+                description="Defina quando o espaço pode receber aulas. Os horários dos professores são configurados separadamente."
+                rows={studioAvailabilityQuery.data || []}
+                idPrefix="studio-hours"
+                isLoading={studioAvailabilityQuery.isLoading}
+                isSaving={saveStudioAvailabilityMutation.isPending}
+                isDisabled={Boolean(studioAvailabilityQuery.error)}
+                onSave={(rows) => saveStudioAvailabilityMutation.mutate(rows)}
+              />
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Criar outro workspace</CardTitle>

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getNextPaymentDate, getPaymentStatus } from "@/utils/paymentUtils";
 import { formatPhone, unformatPhone } from "@/utils/formatUtils";
+import { addMinutesToTime, slotFitsAvailability, WEEKDAY_BY_NAME } from "@/modules/availability/availabilityUtils";
 
 export default function StudentForm({
   student,
@@ -17,6 +18,11 @@ export default function StudentForm({
   teachers = [],
   currentUserId,
   workspaceRole,
+  accountType,
+  studioAvailability = [],
+  teacherAvailability = [],
+  isAvailabilityLoading = false,
+  defaultLessonDuration = 60,
 }) {
   const [formData, setFormData] = useState(student ? {
     ...student,
@@ -49,6 +55,7 @@ export default function StudentForm({
   });
 
   const [calculatedPaymentStatus, setCalculatedPaymentStatus] = useState(formData.payment_status || 'pending');
+  const [availabilityError, setAvailabilityError] = useState('');
 
   useEffect(() => {
     if (formData.payment_type === 'weekly' || !formData.payment_day) {
@@ -80,6 +87,47 @@ export default function StudentForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setAvailabilityError('');
+
+    const scheduleChanged = !student
+      || formData.lesson_day !== student.lesson_day
+      || formData.lesson_time !== student.lesson_time
+      || formData.teacher_user_id !== student.teacher_user_id;
+    if (
+      accountType === 'studio'
+      && formData.student_status === 'active'
+      && formData.lesson_day
+      && formData.lesson_time
+      && scheduleChanged
+    ) {
+      if (isAvailabilityLoading) {
+        setAvailabilityError('Aguarde o carregamento dos horários antes de salvar a aula recorrente.');
+        return;
+      }
+
+      if (!formData.teacher_user_id) {
+        setAvailabilityError('Selecione o professor responsável para verificar os horários da aula recorrente.');
+        return;
+      }
+
+      const slot = {
+        weekday: WEEKDAY_BY_NAME[formData.lesson_day],
+        start_time: formData.lesson_time,
+        end_time: addMinutesToTime(formData.lesson_time, Number(defaultLessonDuration) || 60),
+      };
+
+      if (!slotFitsAvailability(slot, studioAvailability)) {
+        setAvailabilityError('O horário da aula precisa estar dentro do funcionamento do estúdio.');
+        return;
+      }
+      if (!slotFitsAvailability(slot, teacherAvailability.filter((row) => (
+        row.teacher_user_id === formData.teacher_user_id
+      )))) {
+        setAvailabilityError('O horário da aula está fora da disponibilidade do professor selecionado.');
+        return;
+      }
+    }
+
     const nextPaymentDate = getNextPaymentDate(
       formData.payment_type === 'weekly' ? undefined : formData.payment_day,
       calculatedPaymentStatus || 'pending',
@@ -441,6 +489,12 @@ export default function StudentForm({
           className={inputClass}
         />
       </div>
+
+      {availabilityError && (
+        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          {availabilityError}
+        </p>
+      )}
 
       <div className="flex gap-3 justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>

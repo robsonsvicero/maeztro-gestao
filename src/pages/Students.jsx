@@ -20,6 +20,8 @@ import { lessonService } from "@/modules/lessons/services/lessonService";
 import { appSettingsService } from "@/modules/settings/services/settingsService";
 import { studentService } from "@/modules/students/services/studentService";
 import { automationService } from "@/modules/automations/automationService";
+import { availabilityService } from "@/modules/availability/services/availabilityService";
+import { addMinutesToTime, slotFitsAvailability, WEEKDAY_BY_NAME } from "@/modules/availability/availabilityUtils";
 import { useAuth } from "@/lib/AuthContext";
 
 import StudentForm from "../components/students/StudentForm";
@@ -30,7 +32,7 @@ import ReceiptPreview from "../components/receipts/ReceiptPreview";
 import RescheduleModal from "../components/students/RescheduleModal";
 
 export default function Students() {
-  const { workspaceRole, activeWorkspaceId, userId } = useAuth();
+  const { workspaceRole, activeWorkspaceId, userId, accountType } = useAuth();
   const canManageFinancials = workspaceRole === 'owner';
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -56,6 +58,17 @@ export default function Students() {
     queryKey: ['workspaceTeachers', activeWorkspaceId],
     queryFn: () => automationService.listAssignableMembers(),
     enabled: Boolean(activeWorkspaceId),
+  });
+
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
 
   const settings = appSettings[0] || {};
@@ -207,6 +220,33 @@ export default function Students() {
 
   const handleReschedule = async (newDay, newTime) => {
     if (!rescheduleStudent) return;
+    if (accountType === 'studio') {
+      if (studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading) {
+        toast.error('Aguarde o carregamento dos horários antes de reagendar.');
+        return;
+      }
+      if (!rescheduleStudent.teacher_user_id) {
+        toast.error('Defina um professor para validar o novo horário.');
+        return;
+      }
+      const durationMinutes = Number(settings.default_lesson_duration) || 60;
+      const slot = {
+        weekday: WEEKDAY_BY_NAME[newDay],
+        start_time: newTime,
+        end_time: addMinutesToTime(newTime, durationMinutes),
+      };
+      if (!slotFitsAvailability(slot, studioAvailabilityQuery.data || [])) {
+        toast.error('O novo horário precisa estar dentro do funcionamento do estúdio.');
+        return;
+      }
+      if (!slotFitsAvailability(slot, (teacherAvailabilityQuery.data || []).filter((row) => (
+        row.teacher_user_id === rescheduleStudent.teacher_user_id
+      )))) {
+        toast.error('O novo horário está fora da disponibilidade do professor.');
+        return;
+      }
+    }
+
     setIsRescheduling(true);
     try {
       const durationMinutes = Number(settings.default_lesson_duration) || 60;
@@ -602,6 +642,11 @@ export default function Students() {
             teachers={teachers}
             currentUserId={userId}
             workspaceRole={workspaceRole}
+            accountType={accountType}
+            studioAvailability={studioAvailabilityQuery.data || []}
+            teacherAvailability={teacherAvailabilityQuery.data || []}
+            isAvailabilityLoading={studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading}
+            defaultLessonDuration={Number(settings.default_lesson_duration) || 60}
             onCancel={() => {
               setShowForm(false);
               setEditingStudent(null);

@@ -24,6 +24,7 @@ import { transactionService } from '@/modules/finance/services/financeService';
 import { appSettingsService } from '@/modules/settings/services/settingsService';
 import { crmContactService, crmLeadService, crmTrialService } from '@/modules/crm/services/crmService';
 import { automationService } from '@/modules/automations/automationService';
+import { availabilityService } from '@/modules/availability/services/availabilityService';
 import { getDashboardIntelligence, normalizePersonalAvailability } from '@/modules/intelligence/dashboardMetrics';
 import StatCard from '../components/dashboard/StatCard';
 import RecentTransactions from '../components/dashboard/RecentTransactions';
@@ -133,9 +134,14 @@ export default function Dashboard() {
     queryFn: () => crmTrialService.list(),
     enabled: Boolean(activeWorkspaceId),
   });
-  const availabilityQuery = useQuery({
-    queryKey: ['workspaceAvailability', activeWorkspaceId],
-    queryFn: () => automationService.listAvailability(),
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
     enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
   const appSettingsQuery = useQuery({
@@ -157,7 +163,10 @@ export default function Dashboard() {
     { label: 'histórico de contatos', query: contactLeadIdsQuery },
     { label: 'aulas experimentais', query: trialsQuery },
     ...(accountType === 'studio'
-      ? [{ label: 'horários do estúdio', query: availabilityQuery }]
+      ? [
+        { label: 'horários do estúdio', query: studioAvailabilityQuery },
+        { label: 'horários dos professores', query: teacherAvailabilityQuery },
+      ]
       : [{ label: 'horários do professor', query: appSettingsQuery }]),
     { label: 'equipe de professores', query: teachersQuery },
   ];
@@ -169,9 +178,9 @@ export default function Dashboard() {
   const transactions = transactionsQuery.data || [];
   const availability = useMemo(() => (
     accountType === 'studio'
-      ? availabilityQuery.data || []
+      ? studioAvailabilityQuery.data || []
       : normalizePersonalAvailability(appSettingsQuery.data?.[0]?.available_hours)
-  ), [accountType, availabilityQuery.data, appSettingsQuery.data]);
+  ), [accountType, studioAvailabilityQuery.data, appSettingsQuery.data]);
 
   const intelligence = useMemo(() => getDashboardIntelligence({
     students,
@@ -180,6 +189,7 @@ export default function Dashboard() {
     trials: trialsQuery.data || [],
     contactLeadIds: contactLeadIdsQuery.data || [],
     availability,
+    teacherSchedules: teacherAvailabilityQuery.data || [],
     teachers: teachersQuery.data || [],
     accountType,
     now,
@@ -191,6 +201,7 @@ export default function Dashboard() {
     trialsQuery.data,
     contactLeadIdsQuery.data,
     availability,
+    teacherAvailabilityQuery.data,
     teachersQuery.data,
     accountType,
     now,
@@ -264,7 +275,7 @@ export default function Dashboard() {
     ['crmContactLeadIds', activeWorkspaceId],
     ['crmTrials', activeWorkspaceId],
     ...(accountType === 'studio'
-      ? [['workspaceAvailability', activeWorkspaceId]]
+      ? [['studioAvailability', activeWorkspaceId], ['teacherAvailability', activeWorkspaceId]]
       : [['appSettings']]),
     ['workspaceTeachers', activeWorkspaceId],
   ];
@@ -439,19 +450,19 @@ export default function Dashboard() {
             <DashboardSection
               title="Ocupação e disponibilidade"
               description={`Aulas marcadas e estimativa de horários livres nos próximos ${FORECAST_DAYS} dias.`}
-              actionHref={accountType === 'studio' ? 'Schedule' : 'Settings'}
-              actionLabel={accountType === 'studio' ? 'Abrir agenda' : 'Configurar horários'}
+              actionHref={accountType === 'studio' ? 'Automations' : 'Settings'}
+              actionLabel={accountType === 'studio' ? 'Configurar equipe' : 'Configurar horários'}
             >
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{accountType === 'studio'
-                  ? 'A estimativa usa a grade geral do estúdio e os compromissos atribuídos; aulas sem professor definido não reduzem a disponibilidade.'
+                  ? 'A estimativa combina o funcionamento do estúdio com os horários individuais e os compromissos de cada professor.'
                   : 'A estimativa usa os horários configurados pelo professor em Configurações e considera os compromissos deste professor.'}</p>
               </div>
               {!intelligence.teacherAvailability.configured ? (
                 <p className="py-3 text-sm text-slate-600 dark:text-slate-300">
                   {accountType === 'studio'
-                    ? 'Configure os horários do estúdio em Automações para estimar a disponibilidade.'
+                    ? 'Configure o funcionamento na página Estúdio e a disponibilidade dos professores em Automações.'
                     : 'Configure seus horários disponíveis em Configurações para estimar a disponibilidade.'}
                 </p>
               ) : intelligence.teacherAvailability.availableTeachers.length === 0 ? (

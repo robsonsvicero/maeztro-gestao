@@ -91,7 +91,10 @@ test('schedule occupancy unions overlapping lessons and blocks when hours are no
   ];
   const configured = evaluateAutomationRule(rule, {
     lessons,
-    availability: [{ weekday: 1, is_available: true, start_time: '08:00', end_time: '10:00' }],
+    availability: [
+      { weekday: 1, start_time: '08:00', end_time: '09:00' },
+      { weekday: 1, start_time: '09:00', end_time: '10:00' },
+    ],
   }, now);
   assert.equal(configured.candidates[0].details.percentage, 100);
 

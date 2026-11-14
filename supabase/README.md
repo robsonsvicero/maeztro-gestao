@@ -85,12 +85,25 @@ de Licenças. A alteração atualiza os workspaces pertencentes ao usuário, sem
 mover ou apagar dados. Os valores comerciais e o produto de cobrança ainda
 precisam ser configurados no provedor de pagamentos antes de cobrar os planos.
 
-## Configurações de membros do Estúdio
+## Horários e configurações do Estúdio
 
 Execute `studio_member_settings.sql` depois de `workspaces.sql` e
-`account_types.sql`. A função permite a professores e membros financeiros ativos
-alterar apenas nome profissional, telefone, logo/foto, duração padrão e horários
-disponíveis. O acesso às Automações continua exclusivo do proprietário.
+`account_types.sql`. A função permite que membros ativos alterem somente os
+campos compartilhados de nome profissional, telefone, logo/foto e duração
+padrão; ela não altera a disponibilidade do estúdio nem dos professores.
+
+Depois de `automations.sql` e `studio_member_settings.sql`, execute
+`studio_availability.sql`. Ela migra os horários atuais do estúdio, cria uma
+grade semanal própria para o espaço e outra por professor, e permite que o
+proprietário gerencie a equipe em Automações enquanto cada professor altera
+somente a própria grade em Configurações. Horários antigos que estavam no campo
+compartilhado `app_settings.available_hours` não podem ser atribuídos com
+segurança a uma pessoa específica; após a migration, cada professor deverá
+confirmar sua grade individual.
+
+Agendamentos de estúdio devem caber tanto no horário do espaço quanto no horário
+do professor selecionado. O acesso às Automações continua exclusivo do
+proprietário.
 
 O CRM é privado ao proprietário. Professores designados veem na agenda somente
 o horário e o rótulo “Aula experimental”. Após aplicar a migration, publique a
@@ -116,9 +129,8 @@ O Dashboard mantém os valores financeiros registrados e adiciona indicadores
 determinísticos para cobranças, recebimentos previstos, agenda, retornos do CRM
 e encerramentos. A previsão mensal usa o próximo vencimento cadastrado; na
 cobrança semanal, considera uma cobrança por semana com aula marcada, conforme
-o fluxo atual. A disponibilidade individual é apenas uma estimativa, calculada
-com a grade geral do estúdio menos os compromissos atribuídos a cada professor;
-ela não substitui uma grade de disponibilidade por professor.
+o fluxo atual. A disponibilidade individual considera a interseção dos horários do estúdio e
+do professor, descontando os compromissos atribuídos a cada professor.
 
 ## Administração de licenças
 

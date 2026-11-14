@@ -1,5 +1,6 @@
 import { getLocalDateString, parseLocalDate } from '../../utils/dateUtils.js';
 import { getWeekStartKey } from '../../utils/paymentUtils.js';
+import { intersectAvailability } from '../availability/availabilityUtils.js';
 
 const CLOSED_LEAD_STAGES = new Set(['enrolled', 'not_converted']);
 const CANCELED_STATUSES = new Set(['canceled', 'cancelled']);
@@ -216,15 +217,15 @@ const getAppointments = (lessons, trials, startKey, endExclusiveKey) => {
   return [...lessonEvents, ...trialEvents];
 };
 
-const createTeacherAvailability = (teachers, availability, appointments, today, horizonDays) => {
-  const availableDays = new Map();
-  for (const row of availability) {
-    if (!row.is_available) continue;
-    const weekday = Number(row.weekday);
-    const dayRows = availableDays.get(weekday) || [];
-    dayRows.push(row);
-    availableDays.set(weekday, dayRows);
-  }
+const createTeacherAvailability = (
+  teachers,
+  studioAvailability,
+  teacherAvailability,
+  appointments,
+  today,
+  horizonDays,
+  accountType,
+) => {
   const appointmentsByTeacherDay = new Map();
   for (const appointment of appointments) {
     if (!appointment.teacherId) continue;
@@ -237,6 +238,21 @@ const createTeacherAvailability = (teachers, availability, appointments, today, 
   const endExclusiveKey = getLocalDateString(addDays(today, horizonDays));
 
   const availableTeachers = teachers.map((teacher) => {
+    const teacherRows = accountType === 'studio'
+      ? intersectAvailability(
+        studioAvailability,
+        teacherAvailability.filter((row) => row.teacher_user_id === teacher.user_id),
+      )
+      : studioAvailability;
+    const availableDays = new Map();
+    for (const row of teacherRows) {
+      if (row.is_available === false) continue;
+      const weekday = Number(row.weekday);
+      const dayRows = availableDays.get(weekday) || [];
+      dayRows.push(row);
+      availableDays.set(weekday, dayRows);
+    }
+
     let availableMinutes = 0;
     let nextSlot = null;
     for (let offset = 0; offset < horizonDays; offset += 1) {
@@ -277,7 +293,9 @@ const createTeacherAvailability = (teachers, availability, appointments, today, 
     .sort((left, right) => right.availableHours - left.availableHours);
 
   return {
-    configured: availability.some((row) => row.is_available),
+    configured: accountType === 'studio'
+      ? studioAvailability.length > 0 && teacherAvailability.length > 0
+      : studioAvailability.some((row) => row.is_available !== false),
     availableTeachers,
     startDate: startKey,
     endDateExclusive: endExclusiveKey,
@@ -291,6 +309,7 @@ export const getDashboardIntelligence = ({
   leads = [],
   contactLeadIds = [],
   availability = [],
+  teacherSchedules = [],
   teachers = [],
   accountType = 'studio',
   now = new Date(),
@@ -354,9 +373,11 @@ export const getDashboardIntelligence = ({
   const teacherAvailability = createTeacherAvailability(
     teachers,
     availability,
+    teacherSchedules,
     appointments,
     now,
     horizonDays,
+    accountType,
   );
 
   return {

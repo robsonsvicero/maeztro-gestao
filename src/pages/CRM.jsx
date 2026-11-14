@@ -23,6 +23,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/AuthContext';
 import { Link } from 'react-router-dom';
 import { automationService } from '@/modules/automations/automationService';
+import { availabilityService } from '@/modules/availability/services/availabilityService';
+import { slotFitsAvailability } from '@/modules/availability/availabilityUtils';
 import {
   CRM_CONTACT_CHANNELS,
   CRM_SOURCES,
@@ -194,14 +196,57 @@ function ContactForm({ leadId, isSaving, onSave }) {
   );
 }
 
-function TrialForm({ leadId, teachers, teachersError, isSaving, onSchedule }) {
+function TrialForm({
+  leadId,
+  teachers,
+  teachersError,
+  isSaving,
+  onSchedule,
+  accountType,
+  studioAvailability,
+  teacherAvailability,
+  availabilityLoading,
+  availabilityQueryError,
+}) {
   const [date, setDate] = useState(() => localDate());
   const [startTime, setStartTime] = useState('15:00');
   const [endTime, setEndTime] = useState('16:00');
   const [teacherUserId, setTeacherUserId] = useState('none');
+  const [availabilityError, setAvailabilityError] = useState('');
 
   const submit = (event) => {
     event.preventDefault();
+    setAvailabilityError('');
+    if (accountType === 'studio') {
+      if (availabilityQueryError) {
+        setAvailabilityError(`Não foi possível carregar os horários: ${availabilityQueryError.message}`);
+        return;
+      }
+      if (availabilityLoading) {
+        setAvailabilityError('Aguarde o carregamento dos horários antes de agendar.');
+        return;
+      }
+      if (teacherUserId === 'none') {
+        setAvailabilityError('Selecione o professor responsável pela aula experimental.');
+        return;
+      }
+      const slot = {
+        weekday: new Date(`${date}T12:00:00`).getDay(),
+        start_time: startTime,
+        end_time: endTime,
+      };
+      if (!slotFitsAvailability(slot, studioAvailability)) {
+        setAvailabilityError('O horário precisa estar dentro do funcionamento do estúdio.');
+        return;
+      }
+      if (!slotFitsAvailability(slot, teacherAvailability.filter((row) => (
+        row.teacher_user_id === teacherUserId
+      )))) {
+        setAvailabilityError('O horário está fora da disponibilidade do professor selecionado.');
+        return;
+      }
+    }
+
     onSchedule({
       leadId,
       date,
@@ -245,9 +290,17 @@ function TrialForm({ leadId, teachers, teachersError, isSaving, onSchedule }) {
       </div>
       {teachersError && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-200">
-          Não foi possível carregar a equipe. Você pode agendar sem designar um professor e definir depois.
+          {accountType === 'studio'
+            ? 'Não foi possível carregar a equipe. Recarregue o CRM antes de agendar.'
+            : 'Não foi possível carregar a equipe. Você pode agendar sem designar um professor e definir depois.'}
         </p>
       )}
+      {availabilityQueryError && (
+        <p role="alert" className="text-sm text-red-800 dark:text-red-200">
+          Não foi possível carregar os horários: {availabilityQueryError.message}
+        </p>
+      )}
+      {availabilityError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{availabilityError}</p>}
       {startTime >= endTime && <p className="text-sm text-red-700 dark:text-red-300">O horário de término deve ser posterior ao início.</p>}
       <div className="flex justify-end">
         <Button type="submit" size="sm" disabled={isSaving || startTime >= endTime}>
@@ -273,6 +326,11 @@ function LeadDetails({
   isUpdatingTrial,
   isUpdatingLead,
   isConverting,
+  accountType,
+  studioAvailability,
+  teacherAvailability,
+  availabilityLoading,
+  availabilityQueryError,
   onAddContact,
   onScheduleTrial,
   onUpdateTrial,
@@ -389,6 +447,11 @@ function LeadDetails({
             leadId={lead.id}
             teachers={teachers}
             teachersError={teachersError}
+            accountType={accountType}
+            studioAvailability={studioAvailability}
+            teacherAvailability={teacherAvailability}
+            availabilityLoading={availabilityLoading}
+            availabilityQueryError={availabilityQueryError}
             isSaving={isSchedulingTrial}
             onSchedule={(payload) => onScheduleTrial(payload, () => setShowTrialForm(false))}
           />
@@ -460,7 +523,7 @@ function LeadDetails({
 }
 
 export default function CRM() {
-  const { activeWorkspaceId, workspaceRole } = useAuth();
+  const { activeWorkspaceId, workspaceRole, accountType } = useAuth();
   const queryClient = useQueryClient();
   const [activeStage, setActiveStage] = useState('new_lead');
   const [search, setSearch] = useState('');
@@ -486,6 +549,16 @@ export default function CRM() {
     queryKey: ['workspaceTeachers', activeWorkspaceId],
     queryFn: () => automationService.listAssignableMembers(),
     enabled: Boolean(activeWorkspaceId && workspaceRole === 'owner'),
+  });
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && workspaceRole === 'owner' && accountType === 'studio'),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && workspaceRole === 'owner' && accountType === 'studio'),
   });
 
   const contactsQuery = useQuery({
@@ -840,6 +913,11 @@ export default function CRM() {
               contactsError={contactsQuery.error}
               onRetryContacts={() => contactsQuery.refetch()}
               teachersError={teachersQuery.error}
+              accountType={accountType}
+              studioAvailability={studioAvailabilityQuery.data || []}
+              teacherAvailability={teacherAvailabilityQuery.data || []}
+              availabilityLoading={studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading}
+              availabilityQueryError={studioAvailabilityQuery.error || teacherAvailabilityQuery.error}
               isSavingContact={addContactMutation.isPending}
               isSchedulingTrial={scheduleTrialMutation.isPending}
               isUpdatingTrial={updateTrialMutation.isPending}

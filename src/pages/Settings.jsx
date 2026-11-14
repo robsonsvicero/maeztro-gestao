@@ -4,7 +4,9 @@ import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
 import { isStudioMember } from "@/modules/shared/accessControl";
+import AvailabilityEditor from "@/components/availability/AvailabilityEditor";
 import { profileService } from "@/modules/auth/services/profileService";
+import { availabilityService } from "@/modules/availability/services/availabilityService";
 import { appSettingsService } from "@/modules/settings/services/settingsService";
 import { storageService } from "@/modules/shared/services/storageService";
 import { getSubscriptionPlans, isGooglePlayBillingAvailable, openSubscriptionManagement, purchaseSubscription } from "@/services/billing/googlePlayBilling";
@@ -47,9 +49,11 @@ export default function Settings() {
     activeWorkspaceId,
     accountType,
     isAdmin,
+    userId,
     workspaceRole,
   } = useAuth();
   const isMemberSettings = isStudioMember(workspaceRole, accountType, isAdmin);
+  const isStudioTeacher = accountType === 'studio' && workspaceRole === 'teacher' && !isAdmin;
   const [uploading, setUploading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [billingAvailable, setBillingAvailable] = useState(false);
@@ -60,6 +64,11 @@ export default function Settings() {
   const { data: settings = [], isLoading: _isLoading } = useQuery({
     queryKey: ['appSettings'],
     queryFn: () => appSettingsService.list(),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId, userId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId, userId),
+    enabled: isStudioTeacher && Boolean(activeWorkspaceId && userId),
   });
 
   const [formData, setFormData] = useState({
@@ -201,6 +210,20 @@ export default function Settings() {
     message: "",
   });
 
+  const saveTeacherAvailabilityMutation = useMutation({
+    mutationFn: (rows) => availabilityService.saveTeacher(activeWorkspaceId, userId, rows),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['teacherAvailability', activeWorkspaceId] });
+      await queryClient.invalidateQueries({ queryKey: ['teacherAvailability', activeWorkspaceId, userId] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboardIntelligence', activeWorkspaceId] });
+      setSaveFeedback({ type: 'success', message: 'Sua disponibilidade foi salva.' });
+    },
+    onError: (error) => setSaveFeedback({
+      type: 'error',
+      message: error.message || 'Não foi possível salvar sua disponibilidade.',
+    }),
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data) => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -218,7 +241,6 @@ export default function Settings() {
           new_teacher_phone: data.teacher_phone,
           new_logo_url: data.logo_url,
           new_default_lesson_duration: data.default_lesson_duration,
-          new_available_hours: data.available_hours,
         });
         if (error) throw error;
         if (!savedSettings) throw new Error('O servidor não confirmou a atualização das configurações.');
@@ -336,6 +358,26 @@ export default function Settings() {
       <div className="space-y-6">
 
         {/* Informações Gerais */}
+        {isStudioTeacher && (
+          <div className="space-y-3">
+            {teacherAvailabilityQuery.error && (
+              <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                Não foi possível carregar sua disponibilidade: {teacherAvailabilityQuery.error.message}
+              </p>
+            )}
+            <AvailabilityEditor
+              title="Minha disponibilidade"
+              description="Seus horários só poderão receber aulas quando também estiverem dentro do funcionamento do estúdio."
+              rows={teacherAvailabilityQuery.data || []}
+              idPrefix={`teacher-hours-${userId}`}
+              isLoading={teacherAvailabilityQuery.isLoading}
+              isSaving={saveTeacherAvailabilityMutation.isPending}
+              isDisabled={Boolean(teacherAvailabilityQuery.error)}
+              onSave={(rows) => saveTeacherAvailabilityMutation.mutate(rows)}
+            />
+          </div>
+        )}
+
         <Card className="shadow-xl">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
@@ -537,7 +579,7 @@ export default function Settings() {
           </CardContent>
         </Card>}
 
-        <Card className="shadow-xl">
+        {(accountType !== 'studio' || isAdmin) && <Card className="shadow-xl">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-[#094C7E]" />
@@ -596,7 +638,7 @@ export default function Settings() {
               </div>
             ))}
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card className="shadow-xl">
           <CardHeader className="border-b">

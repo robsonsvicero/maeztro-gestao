@@ -3,23 +3,31 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Clock, User, Send, Sparkles } from "lucide-react";
-import { format, addDays, startOfWeek, isSameDay } from "date-fns";
+import { format, addDays, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getPaymentStatus } from "@/utils/paymentUtils";
 import { lessonService } from "@/modules/lessons/services/lessonService";
+import { useAuth } from "@/lib/AuthContext";
 import { notificationService } from "@/modules/notifications/services/notificationService";
 import { appSettingsService } from "@/modules/settings/services/settingsService";
 import { studentService } from "@/modules/students/services/studentService";
+import { automationService } from "@/modules/automations/automationService";
+import { availabilityService } from "@/modules/availability/services/availabilityService";
+import { generateTimeSlots, intersectAvailability, WEEKDAY_BY_NAME } from "@/modules/availability/availabilityUtils";
 
 import ScheduleSuggestions from "../components/schedule/ScheduleSuggestions";
 import StudentSelector from "../components/schedule/StudentSelector";
 
 export default function AutoSchedule() {
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isScheduling, setIsScheduling] = useState(false);
   const queryClient = useQueryClient();
+  const { activeWorkspaceId, accountType, userId, workspaceRole } = useAuth();
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
@@ -36,7 +44,39 @@ export default function AutoSchedule() {
     queryFn: () => appSettingsService.list(),
   });
 
+  const studioAvailabilityQuery = useQuery({
+    queryKey: ['studioAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listStudio(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const teachersQuery = useQuery({
+    queryKey: ['workspaceTeachers', activeWorkspaceId],
+    queryFn: () => automationService.listAssignableMembers(),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+
   const settings = appSettings[0] || {};
+  const selectedTeacher = teachersQuery.data?.find((teacher) => teacher.user_id === selectedTeacherId);
+  const effectiveAvailability = accountType === 'studio'
+    ? intersectAvailability(
+      studioAvailabilityQuery.data || [],
+      (teacherAvailabilityQuery.data || []).filter((row) => row.teacher_user_id === selectedTeacherId),
+    )
+    : [];
+  const individualHasAvailability = Object.values(settings.available_hours || {})
+    .some((slots) => Array.isArray(slots) && slots.length > 0);
+  const isAvailabilityConfigured = accountType === 'studio'
+    ? Boolean(selectedTeacherId)
+      && (studioAvailabilityQuery.data || []).length > 0
+      && (teacherAvailabilityQuery.data || []).some((row) => row.teacher_user_id === selectedTeacherId)
+    : individualHasAvailability;
+  const isAvailabilityLoading = accountType === 'studio'
+    && (studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading || teachersQuery.isLoading);
 
   const createLessonMutation = useMutation({
     mutationFn: async (lessonData) => {
@@ -112,7 +152,9 @@ export default function AutoSchedule() {
 
     const lessonData = {
       student_id: selectedStudent.id,
-      teacher_user_id: selectedStudent.teacher_user_id || null,
+      teacher_user_id: accountType === 'studio'
+        ? selectedTeacherId
+        : selectedStudent.teacher_user_id || null,
       attendance_status: 'pending',
       student_name: selectedStudent.full_name,
       instrument: selectedStudent.instrument,
@@ -128,68 +170,44 @@ export default function AutoSchedule() {
   };
 
   const getAvailableSlots = () => {
-    if (!selectedStudent || !settings.available_hours) return [];
+    if (!selectedStudent || !isAvailabilityConfigured) return [];
 
     const slots = [];
     const startDate = startOfWeek(new Date(), { locale: ptBR });
     const duration = settings.default_lesson_duration || 60;
+    const personalAvailability = Object.entries(settings.available_hours || {}).flatMap(([day, windows]) => (
+      Array.isArray(windows) && WEEKDAY_BY_NAME[day] !== undefined
+        ? windows.map((window) => ({
+          weekday: WEEKDAY_BY_NAME[day],
+          start_time: window.start,
+          end_time: window.end,
+        }))
+        : []
+    ));
 
     // Get next 4 weeks
     for (let week = 0; week < 4; week++) {
       for (let day = 0; day < 7; day++) {
         const currentDate = addDays(startDate, week * 7 + day);
-        const dayName = format(currentDate, 'EEEE', { locale: ptBR }).toLowerCase();
-
-        // Map Portuguese day names to English
-        const dayMap = {
-          'domingo': 'sunday',
-          'segunda-feira': 'monday',
-          'terça-feira': 'tuesday',
-          'quarta-feira': 'wednesday',
-          'quinta-feira': 'thursday',
-          'sexta-feira': 'friday',
-          'sábado': 'saturday'
-        };
-
-        const dayKey = dayMap[dayName];
-        const availableHours = settings.available_hours?.[dayKey] || [];
-
-        availableHours.forEach(slot => {
-          const [startHour, startMin] = slot.start.split(':').map(Number);
-          const [endHour, endMin] = slot.end.split(':').map(Number);
-
-          let currentTime = startHour * 60 + startMin;
-          const endTime = endHour * 60 + endMin;
-
-          while (currentTime + duration <= endTime) {
-            const hours = Math.floor(currentTime / 60);
-            const minutes = currentTime % 60;
-            const start_time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-            const endMinutes = currentTime + duration;
-            const endHours = Math.floor(endMinutes / 60);
-            const endMins = endMinutes % 60;
-            const end_time = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
-
-            // Check if this slot is already booked
-            const isBooked = lessons.some(lesson => 
-              isSameDay(new Date(lesson.date), currentDate) &&
-              lesson.start_time === start_time &&
-              lesson.status !== 'cancelled'
-            );
-
-            if (!isBooked && currentDate > new Date()) {
-              slots.push({
-                date: currentDate,
-                start_time,
-                end_time,
-                dayName: format(currentDate, 'EEEE', { locale: ptBR })
-              });
-            }
-
-            currentTime += duration;
-          }
+        if (currentDate <= new Date()) continue;
+        const dateKey = format(currentDate, 'yyyy-MM-dd');
+        const dayAppointments = lessons.filter((lesson) => (
+          String(lesson.date || lesson.lesson_date || '').slice(0, 10) === dateKey
+        ));
+        const availabilityRows = accountType === 'studio' ? effectiveAvailability : personalAvailability;
+        const timeSlots = generateTimeSlots({
+          availabilityRows,
+          weekday: currentDate.getDay(),
+          durationMinutes: duration,
+          appointments: dayAppointments,
+          teacherUserId: selectedTeacherId,
+          accountType,
         });
+        slots.push(...timeSlots.map((timeSlot) => ({
+          date: currentDate,
+          ...timeSlot,
+          dayName: format(currentDate, 'EEEE', { locale: ptBR }),
+        })));
       }
     }
 
@@ -206,15 +224,66 @@ export default function AutoSchedule() {
           Agendamento Automático
         </h1>
         <p className="text-slate-600 dark:text-slate-400">
-          Agende aulas automaticamente com base na disponibilidade
+          Agende aulas dentro da disponibilidade do professor e do funcionamento do estúdio.
         </p>
       </div>
 
-      {!settings.available_hours && (
+      {accountType === 'studio' && (studioAvailabilityQuery.error || teacherAvailabilityQuery.error || teachersQuery.error) && (
+        <Card role="alert" className="border-red-300">
+          <CardContent className="p-4 text-sm text-red-700">
+            Não foi possível carregar os horários: {
+              studioAvailabilityQuery.error?.message
+              || teacherAvailabilityQuery.error?.message
+              || teachersQuery.error?.message
+            }
+          </CardContent>
+        </Card>
+      )}
+
+      {accountType === 'studio' && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <Label htmlFor="schedule-teacher">Professor responsável</Label>
+              <Select
+                value={selectedTeacherId}
+                onValueChange={(teacherId) => {
+                  setSelectedTeacherId(teacherId);
+                  setSelectedSlot(null);
+                }}
+                disabled={Boolean(selectedStudent?.teacher_user_id) || workspaceRole === 'teacher'}
+              >
+                <SelectTrigger id="schedule-teacher">
+                  <SelectValue placeholder="Selecione um professor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(teachersQuery.data || []).map((teacher) => (
+                    <SelectItem key={teacher.user_id} value={teacher.user_id}>
+                      {teacher.full_name}{teacher.role_key === 'owner' ? ' (proprietário)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedTeacher && (
+                <p className="text-sm text-muted-foreground">
+                  Os horários sugeridos respeitam a disponibilidade de {selectedTeacher.full_name} e do estúdio.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {((accountType === 'studio' && !isAvailabilityLoading && !isAvailabilityConfigured)
+        || (accountType !== 'studio' && !individualHasAvailability)) && (
         <Card className="shadow-xl border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
           <CardContent className="p-6">
             <p className="text-yellow-800 dark:text-yellow-200">
-              ⚠️ Configure seus horários disponíveis nas Configurações para usar o agendamento automático.
+              {accountType === 'studio'
+                ? (studioAvailabilityQuery.data || []).length === 0
+                  ? 'Configure o funcionamento do espaço na página Estúdio.'
+                  : 'Configure os horários deste professor em Automações ou Configurações.'
+                : 'Configure seus horários disponíveis nas Configurações para usar o agendamento automático.'}
             </p>
           </CardContent>
         </Card>
@@ -224,7 +293,11 @@ export default function AutoSchedule() {
         <StudentSelector
           students={students}
           selectedStudent={selectedStudent}
-          onSelectStudent={setSelectedStudent}
+          onSelectStudent={(student) => {
+            setSelectedStudent(student);
+            setSelectedTeacherId(student?.teacher_user_id || (workspaceRole === 'teacher' ? userId : ''));
+            setSelectedSlot(null);
+          }}
         />
 
         {selectedStudent && (
@@ -257,7 +330,7 @@ export default function AutoSchedule() {
         )}
       </div>
 
-      {selectedStudent && settings.available_hours && (
+      {selectedStudent && isAvailabilityConfigured && (
         <ScheduleSuggestions
           slots={availableSlots}
           selectedSlot={selectedSlot}

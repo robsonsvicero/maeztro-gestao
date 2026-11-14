@@ -89,7 +89,13 @@ test('management metrics subtract overlapping assigned appointments from estimat
   const metrics = getDashboardIntelligence({
     now: new Date(2026, 10, 16, 8, 0),
     horizonDays: 1,
-    availability: [{ weekday: 1, is_available: true, start_time: '09:00', end_time: '12:00' }],
+    availability: [{ weekday: 1, start_time: '08:00', end_time: '14:00' }],
+    teacherSchedules: [{
+      teacher_user_id: 'teacher-1',
+      weekday: 1,
+      start_time: '09:00',
+      end_time: '12:00',
+    }],
     teachers: [{ user_id: 'teacher-1', full_name: 'Professora' }],
     lessons: [
       { id: 'lesson-1', teacher_user_id: 'teacher-1', date: '2026-11-16', start_time: '09:30', end_time: '10:30', status: 'scheduled' },
@@ -108,6 +114,28 @@ test('management metrics subtract overlapping assigned appointments from estimat
     startTime: '09:00',
     endTime: '09:30',
   });
+});
+
+test('studio availability estimates intersect the studio hours with each teacher schedule', () => {
+  const metrics = getDashboardIntelligence({
+    now: new Date(2026, 10, 16, 8, 0),
+    horizonDays: 1,
+    availability: [{ weekday: 1, start_time: '08:00', end_time: '22:00' }],
+    teacherSchedules: [
+      { teacher_user_id: 'teacher-a', weekday: 1, start_time: '08:00', end_time: '14:00' },
+      { teacher_user_id: 'teacher-b', weekday: 1, start_time: '15:00', end_time: '17:00' },
+    ],
+    teachers: [
+      { user_id: 'teacher-a', full_name: 'Professora A' },
+      { user_id: 'teacher-b', full_name: 'Professor B' },
+    ],
+  });
+
+  assert.equal(metrics.teacherAvailability.configured, true);
+  assert.deepEqual(
+    metrics.teacherAvailability.availableTeachers.map(({ userId, availableHours }) => [userId, availableHours]),
+    [['teacher-a', 6], ['teacher-b', 2]],
+  );
 });
 
 test('individual availability uses the teacher schedule, its multiple daily slots, and unassigned appointments', () => {

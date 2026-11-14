@@ -106,32 +106,6 @@ export const automationService = {
     throwIfError(error);
   },
 
-  listAvailability: async () => {
-    const workspaceId = requireActiveWorkspaceId();
-    const { data, error } = await supabase.from('workspace_availability')
-      .select('weekday,is_available,start_time,end_time')
-      .eq('workspace_id', workspaceId)
-      .order('weekday');
-    throwIfError(error);
-    return data ?? [];
-  },
-
-  saveAvailability: async (rows) => {
-    const workspaceId = requireActiveWorkspaceId();
-    const payload = rows.map((row) => ({
-      workspace_id: workspaceId,
-      weekday: row.weekday,
-      is_available: row.is_available,
-      start_time: row.is_available ? row.start_time : null,
-      end_time: row.is_available ? row.end_time : null,
-      updated_at: new Date().toISOString(),
-    }));
-    const { error } = await supabase.from('workspace_availability').upsert(payload, {
-      onConflict: 'workspace_id,weekday',
-    });
-    throwIfError(error);
-  },
-
   listAssignableMembers: async () => {
     const workspaceId = requireActiveWorkspaceId();
     const { data, error } = await supabase.rpc('list_workspace_teachers', {

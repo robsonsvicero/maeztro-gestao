@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Clock3, History, LoaderCircle, Settings2, Workflow } from 'lucide-react';
+import { Bell, Check, Clock3, History, Settings2, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AvailabilityEditor from '@/components/availability/AvailabilityEditor';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,13 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/AuthContext';
 import { automationService } from '@/modules/automations/automationService';
 import { AUTOMATION_CATEGORIES, AUTOMATION_RULES, WEEKDAYS } from '@/modules/automations/automationCatalog';
-
-const initialAvailability = WEEKDAYS.map(({ value }) => ({
-  weekday: value,
-  is_available: false,
-  start_time: '08:00',
-  end_time: '20:00',
-}));
+import { availabilityService } from '@/modules/availability/services/availabilityService';
 
 const resultLabels = {
   queued: 'Na fila',
@@ -174,89 +169,32 @@ function RuleCard({
   );
 }
 
-function AvailabilitySettings({ rows, isLoading, isSaving, onSave }) {
-  const [draft, setDraft] = useState(initialAvailability);
-
-  useEffect(() => {
-    if (!rows) return;
-    setDraft(initialAvailability.map((day) => {
-      const saved = rows.find((row) => row.weekday === day.weekday);
-      return saved ? {
-        ...day,
-        ...saved,
-        start_time: saved.start_time?.slice(0, 5) || day.start_time,
-        end_time: saved.end_time?.slice(0, 5) || day.end_time,
-      } : day;
-    }));
-  }, [rows]);
-
-  const updateDay = (weekday, updates) => setDraft((current) => current.map((day) => (
-    day.weekday === weekday ? { ...day, ...updates } : day
-  )));
-
-  const handleSave = () => {
-    const invalidDay = draft.find((day) => (
-      day.is_available
-      && (!day.start_time || !day.end_time || day.start_time >= day.end_time)
-    ));
-    if (invalidDay) {
-      toast.error('Confira os horários de abertura e fechamento de cada dia.');
-      return;
-    }
-    onSave(draft);
-  };
-
+function TeacherAvailabilitySettings({ teachers, rows, isLoading, isDisabled, savingUserId, onSave }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Clock3 className="h-5 w-5" />
-          Horários disponíveis do estúdio
-        </CardTitle>
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold">Disponibilidade dos professores</h2>
         <p className="text-sm text-muted-foreground">
-          Usados para calcular a ocupação semanal. A agenda não será alterada automaticamente.
+          Cada agenda é individual; os horários do estúdio continuam sendo definidos na página Estúdio.
         </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading && <p className="text-sm text-muted-foreground">Carregando horários cadastrados...</p>}
-        {draft.map((day) => {
-          const label = WEEKDAYS.find((item) => item.value === day.weekday)?.label;
-          return (
-            <div key={day.weekday} className="grid items-center gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_auto_1fr_1fr]">
-              <Label className="font-medium">{label}</Label>
-              <div className="flex items-center gap-2">
-                <Switch
-                  aria-label={`${label} disponível`}
-                  checked={day.is_available}
-                  onCheckedChange={(is_available) => updateDay(day.weekday, { is_available })}
-                />
-                <span className="text-sm text-muted-foreground">{day.is_available ? 'Aberto' : 'Fechado'}</span>
-              </div>
-              <Input
-                type="time"
-                aria-label={`${label}: abre às`}
-                disabled={!day.is_available}
-                value={day.start_time}
-                onChange={(event) => updateDay(day.weekday, { start_time: event.target.value })}
-              />
-              <Input
-                type="time"
-                aria-label={`${label}: fecha às`}
-                disabled={!day.is_available}
-                value={day.end_time}
-                onChange={(event) => updateDay(day.weekday, { end_time: event.target.value })}
-              />
-            </div>
-          );
-        })}
-        <div className="flex justify-end pt-2">
-          <Button type="button" disabled={isLoading || isSaving} onClick={handleSave}>
-            {isSaving && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar horários
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      {isLoading ? <p className="text-sm text-muted-foreground">Carregando disponibilidade da equipe...</p>
+        : teachers.length === 0 ? <Card><CardContent className="p-5 text-sm text-muted-foreground">
+          Não há professores ativos para configurar.
+        </CardContent></Card>
+          : teachers.map((teacher) => (
+            <AvailabilityEditor
+              key={teacher.user_id}
+              title={teacher.role_key === 'owner' ? `${teacher.full_name} (proprietário)` : teacher.full_name}
+              description="Esses horários determinam quando este professor pode receber agendamentos."
+              rows={rows.filter((row) => row.teacher_user_id === teacher.user_id)}
+              idPrefix={`teacher-hours-${teacher.user_id}`}
+              isDisabled={isDisabled}
+              isSaving={savingUserId === teacher.user_id}
+              onSave={(teacherRows) => onSave(teacher.user_id, teacherRows)}
+            />
+          ))}
+    </section>
   );
 }
 
@@ -338,9 +276,14 @@ export default function Automations() {
     queryFn: () => automationService.listJobs(),
     enabled: Boolean(activeWorkspaceId),
   });
-  const availabilityQuery = useQuery({
-    queryKey: ['workspaceAvailability', activeWorkspaceId],
-    queryFn: () => automationService.listAvailability(),
+  const teachersQuery = useQuery({
+    queryKey: ['workspaceTeachers', activeWorkspaceId],
+    queryFn: () => automationService.listAssignableMembers(),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const teacherAvailabilityQuery = useQuery({
+    queryKey: ['teacherAvailability', activeWorkspaceId],
+    queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
     enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
 
@@ -371,13 +314,16 @@ export default function Automations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automationEvents', activeWorkspaceId] }),
     onError: (error) => toast.error(error?.message || 'Não foi possível atualizar os avisos.'),
   });
-  const availabilityMutation = useMutation({
-    mutationFn: (rows) => automationService.saveAvailability(rows),
+  const teacherAvailabilityMutation = useMutation({
+    mutationFn: ({ teacherUserId, rows }) => (
+      availabilityService.saveTeacher(activeWorkspaceId, teacherUserId, rows)
+    ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaceAvailability', activeWorkspaceId] });
-      toast.success('Horários do estúdio salvos.');
+      queryClient.invalidateQueries({ queryKey: ['teacherAvailability', activeWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardIntelligence', activeWorkspaceId] });
+      toast.success('Disponibilidade do professor salva.');
     },
-    onError: (error) => toast.error(error?.message || 'Não foi possível salvar os horários.'),
+    onError: (error) => toast.error(error?.message || 'Não foi possível salvar a disponibilidade.'),
   });
 
   const rules = rulesQuery.data || [];
@@ -385,7 +331,7 @@ export default function Automations() {
   const rulesLoading = rulesQuery.isLoading;
   const mutationPending = updateRuleMutation.isPending || preferenceMutation.isPending;
   const pageError = rulesQuery.error || preferencesQuery.error || eventsQuery.error
-    || logsQuery.error || jobsQuery.error || availabilityQuery.error;
+    || logsQuery.error || jobsQuery.error || teachersQuery.error || teacherAvailabilityQuery.error;
 
   return (
     <main className="space-y-6 p-4 md:p-8">
@@ -456,11 +402,15 @@ export default function Automations() {
           </section>
 
           {accountType === 'studio' && (
-            <AvailabilitySettings
-              rows={availabilityQuery.data}
-              isLoading={availabilityQuery.isLoading}
-              isSaving={availabilityMutation.isPending}
-              onSave={(rows) => availabilityMutation.mutate(rows)}
+            <TeacherAvailabilitySettings
+              teachers={teachersQuery.data || []}
+              rows={teacherAvailabilityQuery.data || []}
+              isLoading={teachersQuery.isLoading || teacherAvailabilityQuery.isLoading}
+              isDisabled={Boolean(teachersQuery.error || teacherAvailabilityQuery.error)}
+              savingUserId={teacherAvailabilityMutation.isPending
+                ? teacherAvailabilityMutation.variables?.teacherUserId
+                : null}
+              onSave={(teacherUserId, rows) => teacherAvailabilityMutation.mutate({ teacherUserId, rows })}
             />
           )}
 

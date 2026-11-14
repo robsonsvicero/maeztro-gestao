@@ -105,7 +105,7 @@ const getOccupancy = (lessons, availability, weekStart) => {
   let availableMinutes = 0;
 
   for (const row of availability) {
-    if (!row.is_available) continue;
+    if (row.is_available === false) continue;
     const start = timeStringToMinutes(row.start_time);
     const end = timeStringToMinutes(row.end_time);
     if (start === null || end === null || end <= start) continue;
