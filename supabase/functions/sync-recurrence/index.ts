@@ -57,7 +57,8 @@ const buildLessonWindowForStudent = (student: any, referenceDate = new Date(), d
 
   const firstLessonDate = new Date(referenceDate);
   firstLessonDate.setHours(0, 0, 0, 0);
-  firstLessonDate.setDate(firstLessonDate.getDate() + (targetDayOfWeek - firstLessonDate.getDay() + 7) % 7);
+  const daysUntilNextOccurrence = (targetDayOfWeek - firstLessonDate.getDay() + 7) % 7;
+  firstLessonDate.setDate(firstLessonDate.getDate() + (daysUntilNextOccurrence || 7));
 
   const duration = Number(durationMinutes) || 60;
 

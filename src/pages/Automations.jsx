@@ -308,7 +308,7 @@ function EventsList({ events, isLoading, onMarkRead, onMarkAllRead, isUpdating }
 }
 
 export default function Automations() {
-  const { activeWorkspaceId, userId } = useAuth();
+  const { activeWorkspaceId, accountType, userId } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('rules');
   const rulesKey = ['automationRules', activeWorkspaceId];
@@ -341,7 +341,7 @@ export default function Automations() {
   const availabilityQuery = useQuery({
     queryKey: ['workspaceAvailability', activeWorkspaceId],
     queryFn: () => automationService.listAvailability(),
-    enabled: Boolean(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
 
   const refreshAutomationData = () => {
@@ -455,12 +455,14 @@ export default function Automations() {
                 })}
           </section>
 
-          <AvailabilitySettings
-            rows={availabilityQuery.data}
-            isLoading={availabilityQuery.isLoading}
-            isSaving={availabilityMutation.isPending}
-            onSave={(rows) => availabilityMutation.mutate(rows)}
-          />
+          {accountType === 'studio' && (
+            <AvailabilitySettings
+              rows={availabilityQuery.data}
+              isLoading={availabilityQuery.isLoading}
+              isSaving={availabilityMutation.isPending}
+              onSave={(rows) => availabilityMutation.mutate(rows)}
+            />
+          )}
 
           <EventsList
             events={eventsQuery.data || []}

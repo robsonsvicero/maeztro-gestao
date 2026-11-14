@@ -84,6 +84,29 @@ const formatTime = (minutes) => (
 
 const minutesUntilEndOfToday = (now) => now.getHours() * 60 + now.getMinutes();
 
+const WEEKDAY_BY_KEY = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
+export const normalizePersonalAvailability = (availableHours = {}) => (
+  Object.entries(availableHours || {}).flatMap(([day, slots]) => {
+    const weekday = WEEKDAY_BY_KEY[day];
+    if (weekday === undefined || !Array.isArray(slots)) return [];
+    return slots.map((slot) => ({
+      weekday,
+      is_available: Boolean(slot?.start && slot?.end),
+      start_time: slot?.start || null,
+      end_time: slot?.end || null,
+    }));
+  })
+);
+
 const createMonthlyCharges = (students, todayKey, endExclusiveKey) => {
   const charges = [];
   for (const student of students) {
@@ -194,11 +217,14 @@ const getAppointments = (lessons, trials, startKey, endExclusiveKey) => {
 };
 
 const createTeacherAvailability = (teachers, availability, appointments, today, horizonDays) => {
-  const availableDays = new Map(
-    availability
-      .filter((row) => row.is_available)
-      .map((row) => [Number(row.weekday), row]),
-  );
+  const availableDays = new Map();
+  for (const row of availability) {
+    if (!row.is_available) continue;
+    const weekday = Number(row.weekday);
+    const dayRows = availableDays.get(weekday) || [];
+    dayRows.push(row);
+    availableDays.set(weekday, dayRows);
+  }
   const appointmentsByTeacherDay = new Map();
   for (const appointment of appointments) {
     if (!appointment.teacherId) continue;
@@ -216,27 +242,28 @@ const createTeacherAvailability = (teachers, availability, appointments, today, 
     for (let offset = 0; offset < horizonDays; offset += 1) {
       const date = addDays(today, offset);
       const dateString = getLocalDateString(date);
-      const dayAvailability = availableDays.get(date.getDay());
-      if (!dayAvailability) continue;
-
-      const start = timeToMinutes(dayAvailability.start_time);
-      const end = timeToMinutes(dayAvailability.end_time);
-      if (start === null || end === null || end <= start) continue;
-      const effectiveStart = offset === 0 ? Math.max(start, minutesUntilEndOfToday(today)) : start;
-      if (effectiveStart >= end) continue;
-
+      const dayAvailability = availableDays.get(date.getDay()) || [];
+      if (dayAvailability.length === 0) continue;
       const dayAppointments = appointmentsByTeacherDay.get(`${teacher.user_id}:${dateString}`) || [];
-      const freeIntervals = buildFreeIntervals(dayAppointments, effectiveStart, end);
-      for (const interval of freeIntervals) {
-        const duration = interval.end - interval.start;
-        if (duration <= 0) continue;
-        availableMinutes += duration;
-        if (!nextSlot) {
-          nextSlot = {
-            date: dateString,
-            startTime: formatTime(interval.start),
-            endTime: formatTime(interval.end),
-          };
+      const openingIntervals = occupiedIntervals(dayAvailability, 0, 24 * 60);
+      for (const opening of openingIntervals) {
+        const effectiveStart = offset === 0
+          ? Math.max(opening.start, minutesUntilEndOfToday(today))
+          : opening.start;
+        if (effectiveStart >= opening.end) continue;
+
+        const freeIntervals = buildFreeIntervals(dayAppointments, effectiveStart, opening.end);
+        for (const interval of freeIntervals) {
+          const duration = interval.end - interval.start;
+          if (duration <= 0) continue;
+          availableMinutes += duration;
+          if (!nextSlot) {
+            nextSlot = {
+              date: dateString,
+              startTime: formatTime(interval.start),
+              endTime: formatTime(interval.end),
+            };
+          }
         }
       }
     }
@@ -265,6 +292,7 @@ export const getDashboardIntelligence = ({
   contactLeadIds = [],
   availability = [],
   teachers = [],
+  accountType = 'studio',
   now = new Date(),
   horizonDays = 15,
 } = {}) => {
@@ -310,7 +338,15 @@ export const getDashboardIntelligence = ({
     })
     .sort((left, right) => new Date(left.next_follow_up_at) - new Date(right.next_follow_up_at));
 
-  const appointments = getAppointments(lessons, trials, todayKey, endExclusiveKey);
+  let appointments = getAppointments(lessons, trials, todayKey, endExclusiveKey);
+  if (accountType === 'individual' && teachers.length === 1) {
+    const teacherId = teachers[0].user_id;
+    appointments = appointments.map((appointment) => (
+      appointment.teacherId
+        ? appointment
+        : { ...appointment, teacherId }
+    ));
+  }
   const occupiedMinutes = appointments.reduce((total, appointment) => {
     const interval = eventInterval(appointment);
     return total + (interval ? interval.end - interval.start : 0);

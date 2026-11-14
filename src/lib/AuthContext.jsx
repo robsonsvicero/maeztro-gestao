@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
   const sessionUserId = useRef(null);
   const accessRequestId = useRef(0);
 
-  const refreshWorkspaces = useCallback(async (userId, preferredWorkspaceId = null) => {
+  const refreshWorkspaces = useCallback(async (userId, preferredWorkspaceId = null, { silent = false } = {}) => {
     if (!userId) {
       setWorkspaces([]);
       setActiveWorkspaceIdState(null);
@@ -60,7 +60,7 @@ export function AuthProvider({ children }) {
       return [];
     }
 
-    setIsLoadingWorkspaces(true);
+    if (!silent) setIsLoadingWorkspaces(true);
     setWorkspaceError(null);
     try {
       const availableWorkspaces = await workspaceService.listMine();
@@ -89,7 +89,7 @@ export function AuthProvider({ children }) {
       window.localStorage.setItem(storageKey, selectedWorkspace.workspace_id);
       return availableWorkspaces;
     } catch (error) {
-      if (sessionUserId.current === userId) {
+      if (sessionUserId.current === userId && !silent) {
         setWorkspaceError(error);
         setWorkspaces([]);
         setActiveWorkspaceIdState(null);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
       }
       throw error;
     } finally {
-      if (sessionUserId.current === userId) setIsLoadingWorkspaces(false);
+      if (sessionUserId.current === userId && !silent) setIsLoadingWorkspaces(false);
     }
   }, []);
 
@@ -251,6 +251,23 @@ export function AuthProvider({ children }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return undefined;
+
+    const refreshVisibleWorkspace = () => {
+      if (document.visibilityState !== 'visible') return;
+      refreshWorkspaces(userId, null, { silent: true }).catch((error) => {
+        if (sessionUserId.current === userId) {
+          console.error('Erro ao atualizar o workspace:', error);
+        }
+      });
+    };
+
+    document.addEventListener('visibilitychange', refreshVisibleWorkspace);
+    return () => document.removeEventListener('visibilitychange', refreshVisibleWorkspace);
+  }, [refreshWorkspaces, session?.user?.id]);
 
   const value = useMemo(
     () => {

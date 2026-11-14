@@ -64,11 +64,17 @@ export default function AdminLicenses() {
     onSuccess: () => { setEdits({}); refresh(); },
   });
   const updateAccountType = useMutation({
-    mutationFn: ({ userId, accountType }) => invokeAdmin({
-      action: 'update_account_type',
-      userId,
-      accountType,
-    }),
+    mutationFn: async ({ userId, accountType }) => {
+      const result = await invokeAdmin({
+        action: 'update_account_type',
+        userId,
+        accountType,
+      });
+      if (!result?.ok || result.account_type !== accountType) {
+        throw new Error('O servidor não confirmou a alteração. Publique a versão atual da Edge Function admin-licenses e tente novamente.');
+      }
+      return result;
+    },
     onSuccess: async (_result, { userId }) => {
       setAccountTypeEdits((previous) => {
         const next = { ...previous };

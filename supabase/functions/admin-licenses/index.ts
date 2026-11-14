@@ -63,13 +63,22 @@ Deno.serve(async (request) => {
     if (workspaceLookupError) return reply(500, { error: 'Não foi possível localizar os workspaces da conta.' });
     if (!ownedWorkspaces?.length) return reply(404, { error: 'Nenhum workspace próprio foi encontrado para este usuário.' });
 
-    const { error: workspaceUpdateError } = await admin
+    const { data: updatedWorkspaces, error: workspaceUpdateError } = await admin
       .from('workspaces')
       .update({ account_type: body.accountType, updated_at: now })
-      .eq('owner_id', body.userId);
+      .eq('owner_id', body.userId)
+      .select('id,account_type');
     if (workspaceUpdateError) return reply(500, { error: 'Não foi possível atualizar o tipo de conta.' });
+    if (!updatedWorkspaces?.length || updatedWorkspaces.length !== ownedWorkspaces.length
+      || updatedWorkspaces.some((workspace) => workspace.account_type !== body.accountType)) {
+      return reply(500, { error: 'A alteração do tipo de conta não foi aplicada a todos os workspaces.' });
+    }
 
-    return reply(200, { ok: true, account_type: body.accountType });
+    return reply(200, {
+      ok: true,
+      account_type: body.accountType,
+      updated_workspaces: updatedWorkspaces.length,
+    });
   }
 
   if (body.action === 'update_license' || body.action === 'revoke' || body.action === 'activate') {

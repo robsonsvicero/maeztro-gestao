@@ -96,9 +96,29 @@ export default function Students() {
       }
       return updated;
     },
-    onSuccess: () => {
+    onSuccess: async (updatedStudent) => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Dados do aluno atualizados com sucesso!');
+      if (
+        updatedStudent.lesson_day
+        && updatedStudent.lesson_time
+        && updatedStudent.student_status === 'active'
+      ) {
+        try {
+          const durationMinutes = Number(settings.default_lesson_duration) || 60;
+          const createdLessons = await generateAutomaticLessons(updatedStudent, lessonService, durationMinutes);
+          queryClient.invalidateQueries({ queryKey: ['lessons'] });
+          if (createdLessons.length > 0) {
+            toast.success(`Dados atualizados e ${createdLessons.length} aulas agendadas automaticamente!`);
+          } else {
+            toast.success('Dados do aluno atualizados com sucesso!');
+          }
+        } catch (error) {
+          console.error('Erro ao agendar aulas:', error);
+          toast.error(error?.message || 'Dados atualizados, mas não foi possível agendar as aulas automaticamente.');
+        }
+      } else {
+        toast.success('Dados do aluno atualizados com sucesso!');
+      }
       setShowForm(false);
       setEditingStudent(null);
       setSelectedStudentForFees(null);
@@ -162,18 +182,6 @@ export default function Students() {
       }).catch((error) => {
         console.error('Erro ao deletar aulas:', error);
         toast.error(error?.message || 'Não foi possível cancelar as aulas futuras.');
-      });
-    }
-
-    // Se mudou de inativo para ativo, criar novas aulas
-    if (!wasActive && data.student_status === 'active' && data.lesson_day && data.lesson_time) {
-      const durationMinutes = Number(settings.default_lesson_duration) || 60;
-      generateAutomaticLessons({ ...data, id: editingStudent.id }, lessonService, durationMinutes).then((createdLessons) => {
-        queryClient.invalidateQueries({ queryKey: ['lessons'] });
-        toast.success(`${createdLessons.length} aulas agendadas automaticamente!`);
-      }).catch((error) => {
-        console.error('Erro ao agendar aulas:', error);
-        toast.error(error?.message || 'Não foi possível agendar as aulas automaticamente.');
       });
     }
 

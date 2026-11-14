@@ -17,6 +17,7 @@ test('buildLessonWindowForStudent creates a deterministic 52-week lesson window'
 
   assert.equal(lessons.length, 52);
   assert.equal(new Set(lessons.map((lesson) => lesson.date)).size, 52);
+  assert.equal(lessons[0].date, '2026-09-21');
   assert.equal(lessons[0].start_time, '18:00');
   assert.equal(lessons[0].status, 'scheduled');
 });

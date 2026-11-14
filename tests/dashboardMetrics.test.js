@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getDashboardIntelligence } from '../src/modules/intelligence/dashboardMetrics.js';
+import {
+  getDashboardIntelligence,
+  normalizePersonalAvailability,
+} from '../src/modules/intelligence/dashboardMetrics.js';
 
 const now = new Date(2026, 10, 13, 12, 0);
 
@@ -100,6 +103,36 @@ test('management metrics subtract overlapping assigned appointments from estimat
 
   assert.equal(metrics.occupiedHours, 2.5);
   assert.equal(metrics.teacherAvailability.availableTeachers[0].availableHours, 1);
+  assert.deepEqual(metrics.teacherAvailability.availableTeachers[0].nextSlot, {
+    date: '2026-11-16',
+    startTime: '09:00',
+    endTime: '09:30',
+  });
+});
+
+test('individual availability uses the teacher schedule, its multiple daily slots, and unassigned appointments', () => {
+  const availability = normalizePersonalAvailability({
+    monday: [
+      { start: '09:00', end: '10:00' },
+      { start: '11:00', end: '12:00' },
+    ],
+  });
+  const metrics = getDashboardIntelligence({
+    now: new Date(2026, 10, 16, 8, 0),
+    horizonDays: 1,
+    accountType: 'individual',
+    availability,
+    teachers: [{ user_id: 'teacher-1', full_name: 'Professor' }],
+    lessons: [
+      { id: 'lesson-1', date: '2026-11-16', start_time: '09:30', end_time: '10:00', status: 'scheduled' },
+    ],
+    trials: [
+      { id: 'trial-1', trial_date: '2026-11-16', start_time: '11:15', end_time: '11:30', status: 'scheduled' },
+    ],
+  });
+
+  assert.equal(metrics.teacherAvailability.configured, true);
+  assert.equal(metrics.teacherAvailability.availableTeachers[0].availableHours, 1.3);
   assert.deepEqual(metrics.teacherAvailability.availableTeachers[0].nextSlot, {
     date: '2026-11-16',
     startTime: '09:00',

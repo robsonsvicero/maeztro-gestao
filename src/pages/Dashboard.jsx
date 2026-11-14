@@ -21,9 +21,10 @@ import { useAuth } from '@/lib/AuthContext';
 import { studentService } from '@/modules/students/services/studentService';
 import { lessonService } from '@/modules/lessons/services/lessonService';
 import { transactionService } from '@/modules/finance/services/financeService';
+import { appSettingsService } from '@/modules/settings/services/settingsService';
 import { crmContactService, crmLeadService, crmTrialService } from '@/modules/crm/services/crmService';
 import { automationService } from '@/modules/automations/automationService';
-import { getDashboardIntelligence } from '@/modules/intelligence/dashboardMetrics';
+import { getDashboardIntelligence, normalizePersonalAvailability } from '@/modules/intelligence/dashboardMetrics';
 import StatCard from '../components/dashboard/StatCard';
 import RecentTransactions from '../components/dashboard/RecentTransactions';
 import MonthlyChart from '../components/dashboard/MonthlyChart';
@@ -97,7 +98,7 @@ function InsightRow({ title, detail, status, href }) {
 }
 
 export default function Dashboard() {
-  const { activeWorkspaceId } = useAuth();
+  const { activeWorkspaceId, accountType } = useAuth();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const currentMonth = now;
@@ -135,7 +136,12 @@ export default function Dashboard() {
   const availabilityQuery = useQuery({
     queryKey: ['workspaceAvailability', activeWorkspaceId],
     queryFn: () => automationService.listAvailability(),
-    enabled: Boolean(activeWorkspaceId),
+    enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
+  });
+  const appSettingsQuery = useQuery({
+    queryKey: ['appSettings'],
+    queryFn: () => appSettingsService.list(),
+    enabled: Boolean(activeWorkspaceId && accountType === 'individual'),
   });
   const teachersQuery = useQuery({
     queryKey: ['workspaceTeachers', activeWorkspaceId],
@@ -150,7 +156,9 @@ export default function Dashboard() {
     { label: 'interessados do CRM', query: leadsQuery },
     { label: 'histórico de contatos', query: contactLeadIdsQuery },
     { label: 'aulas experimentais', query: trialsQuery },
-    { label: 'horários do estúdio', query: availabilityQuery },
+    ...(accountType === 'studio'
+      ? [{ label: 'horários do estúdio', query: availabilityQuery }]
+      : [{ label: 'horários do professor', query: appSettingsQuery }]),
     { label: 'equipe de professores', query: teachersQuery },
   ];
   const isLoading = dashboardQueries.some(({ query }) => query.isLoading);
@@ -159,6 +167,11 @@ export default function Dashboard() {
   const lessons = lessonsQuery.data || [];
   const leads = leadsQuery.data || [];
   const transactions = transactionsQuery.data || [];
+  const availability = useMemo(() => (
+    accountType === 'studio'
+      ? availabilityQuery.data || []
+      : normalizePersonalAvailability(appSettingsQuery.data?.[0]?.available_hours)
+  ), [accountType, availabilityQuery.data, appSettingsQuery.data]);
 
   const intelligence = useMemo(() => getDashboardIntelligence({
     students,
@@ -166,8 +179,9 @@ export default function Dashboard() {
     leads,
     trials: trialsQuery.data || [],
     contactLeadIds: contactLeadIdsQuery.data || [],
-    availability: availabilityQuery.data || [],
+    availability,
     teachers: teachersQuery.data || [],
+    accountType,
     now,
     horizonDays: FORECAST_DAYS,
   }), [
@@ -176,8 +190,9 @@ export default function Dashboard() {
     leads,
     trialsQuery.data,
     contactLeadIdsQuery.data,
-    availabilityQuery.data,
+    availability,
     teachersQuery.data,
+    accountType,
     now,
   ]);
 
@@ -248,7 +263,9 @@ export default function Dashboard() {
     ['crm', activeWorkspaceId],
     ['crmContactLeadIds', activeWorkspaceId],
     ['crmTrials', activeWorkspaceId],
-    ['workspaceAvailability', activeWorkspaceId],
+    ...(accountType === 'studio'
+      ? [['workspaceAvailability', activeWorkspaceId]]
+      : [['appSettings']]),
     ['workspaceTeachers', activeWorkspaceId],
   ];
   const refresh = () => {
@@ -422,15 +439,21 @@ export default function Dashboard() {
             <DashboardSection
               title="Ocupação e disponibilidade"
               description={`Aulas marcadas e estimativa de horários livres nos próximos ${FORECAST_DAYS} dias.`}
-              actionHref="Schedule"
-              actionLabel="Abrir agenda"
+              actionHref={accountType === 'studio' ? 'Schedule' : 'Settings'}
+              actionLabel={accountType === 'studio' ? 'Abrir agenda' : 'Configurar horários'}
             >
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>A estimativa usa a grade geral do estúdio e os compromissos atribuídos; não considera disponibilidade individual nem aulas sem professor definido.</p>
+                <p>{accountType === 'studio'
+                  ? 'A estimativa usa a grade geral do estúdio e os compromissos atribuídos; aulas sem professor definido não reduzem a disponibilidade.'
+                  : 'A estimativa usa os horários configurados pelo professor em Configurações e considera os compromissos deste professor.'}</p>
               </div>
               {!intelligence.teacherAvailability.configured ? (
-                <p className="py-3 text-sm text-slate-600 dark:text-slate-300">Configure os horários do estúdio em Automações para estimar a disponibilidade.</p>
+                <p className="py-3 text-sm text-slate-600 dark:text-slate-300">
+                  {accountType === 'studio'
+                    ? 'Configure os horários do estúdio em Automações para estimar a disponibilidade.'
+                    : 'Configure seus horários disponíveis em Configurações para estimar a disponibilidade.'}
+                </p>
               ) : intelligence.teacherAvailability.availableTeachers.length === 0 ? (
                 <p className="py-3 text-sm text-slate-600 dark:text-slate-300">Nenhum professor tem horário livre nesta grade e período.</p>
               ) : (
