@@ -6,7 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getPaymentStatus } from "@/utils/paymentUtils";
 
-export default function LessonForm({ lesson, students, onSubmit, onCancel, theme, appSettings, defaultDate, defaultStartTime }) {
+export default function LessonForm({
+  lesson,
+  students,
+  teachers = [],
+  currentUserId,
+  workspaceRole,
+  onSubmit,
+  onCancel,
+  theme,
+  appSettings,
+  defaultDate,
+  defaultStartTime,
+}) {
   const formatDateInput = (date) => {
     const pad = (n) => String(n).padStart(2, '0');
     const d = date ? (date instanceof Date ? date : new Date(date + "T00:00:00")) : new Date();
@@ -22,10 +34,16 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
   const initialStartTime = defaultStartTime || "09:00";
   const initialDuration = appSettings?.default_lesson_duration || 60;
 
-  const [formData, setFormData] = useState(lesson || {
+  const [formData, setFormData] = useState(lesson ? {
+    ...lesson,
+    teacher_user_id: lesson.teacher_user_id || (workspaceRole === 'teacher' ? currentUserId : null),
+    attendance_status: lesson.attendance_status || (lesson.status === 'completed' ? 'present' : 'pending'),
+  } : {
     student_id: "",
     student_name: "",
     instrument: "",
+    teacher_user_id: workspaceRole === 'teacher' ? currentUserId : null,
+    attendance_status: 'pending',
     date: formatDateInput(defaultDate),
     start_time: initialStartTime,
     end_time: calculateEndTime(initialStartTime, initialDuration),
@@ -38,7 +56,7 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
 
   const selectedStudent = students.find((student) => student.id === formData.student_id);
   const calculatedPaymentStatus = selectedStudent
-    ? getPaymentStatus(selectedStudent.next_payment_date, selectedStudent.last_payment_date)
+    ? getPaymentStatus(selectedStudent.next_payment_date, selectedStudent.payment_history)
     : formData.payment_status || 'pending';
 
   const handleStudentChange = (studentId) => {
@@ -48,7 +66,8 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
         ...formData,
         student_id: studentId,
         student_name: student.full_name,
-        instrument: student.instrument || formData.instrument
+        instrument: student.instrument || formData.instrument,
+        teacher_user_id: student.teacher_user_id || (workspaceRole === 'teacher' ? currentUserId : null),
       });
     }
   };
@@ -68,6 +87,9 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
     onSubmit({
       ...formData,
       payment_status: calculatedPaymentStatus,
+      attendance_status: formData.status === 'completed' && formData.attendance_status === 'pending'
+        ? 'present'
+        : formData.attendance_status || 'pending',
       price: undefined,
     });
   };
@@ -97,6 +119,48 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
             </SelectContent>
           </Select>
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="teacher_user_id" className={labelClass}>Professor responsável</Label>
+          <Select
+            value={formData.teacher_user_id || 'unassigned'}
+            onValueChange={(value) => setFormData({
+              ...formData,
+              teacher_user_id: value === 'unassigned' ? null : value,
+            })}
+          >
+            <SelectTrigger id="teacher_user_id" className={inputClass}>
+              <SelectValue placeholder="Selecione um professor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Sem professor definido</SelectItem>
+              {teachers.map((teacher) => (
+                <SelectItem key={teacher.user_id} value={teacher.user_id}>
+                  {teacher.full_name}{teacher.role_key === 'owner' ? ' (proprietário)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {lesson && lesson.date <= formatDateInput(new Date()) && (
+          <div className="space-y-2">
+            <Label htmlFor="attendance_status" className={labelClass}>Presença</Label>
+            <Select
+              value={formData.attendance_status || 'pending'}
+              onValueChange={(value) => setFormData({ ...formData, attendance_status: value })}
+            >
+              <SelectTrigger id="attendance_status" className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Aguardando confirmação</SelectItem>
+                <SelectItem value="present">Presente</SelectItem>
+                <SelectItem value="absent">Faltou</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="instrument" className={labelClass}>Instrumento *</Label>
@@ -191,7 +255,12 @@ export default function LessonForm({ lesson, students, onSubmit, onCancel, theme
           <Input
             id="payment_status"
             type="text"
-            value={calculatedPaymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+            value={{
+              paid: 'Pago',
+              pending: 'Pendente',
+              overdue: 'Em atraso',
+              canceled: 'Cancelado',
+            }[calculatedPaymentStatus] || 'Pendente'}
             disabled
             readOnly
             className={`${inputClass} bg-slate-100 text-slate-600 cursor-not-allowed dark:bg-slate-800 dark:text-slate-300`}

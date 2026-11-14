@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,10 @@ import { getWeekStartKey } from "@/utils/paymentUtils";
 import ReceiptForm from "../components/receipts/ReceiptForm";
 import ReceiptList from "../components/receipts/ReceiptList";
 import ReceiptPreview from "../components/receipts/ReceiptPreview";
+import { transactionService, receiptService } from "@/modules/finance/services/financeService";
+import { lessonService } from "@/modules/lessons/services/lessonService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
+import { studentService } from "@/modules/students/services/studentService";
 
 const sanitizeReceiptPayload = (data = {}) => ({
   receipt_number: data.receipt_number,
@@ -31,17 +34,17 @@ export default function Receipts() {
 
   const { data: receipts = [], isLoading } = useQuery({
     queryKey: ['receipts'],
-    queryFn: () => base44.entities.Receipt.list('-created_date'),
+    queryFn: () => receiptService.list('-created_date'),
   });
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list(),
+    queryFn: () => studentService.list(),
   });
 
   const { data: appSettings = [] } = useQuery({
     queryKey: ['appSettings'],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => appSettingsService.list(),
   });
 
   const settings = appSettings[0] || {};
@@ -49,7 +52,7 @@ export default function Receipts() {
   const syncWeeklyLessonsPaymentStatus = async (student, weekStart, weekEnd) => {
     if (!student?.id || !weekStart || !weekEnd) return;
 
-    const lessons = await base44.entities.Lesson.list();
+    const lessons = await lessonService.list();
     const start = parseLocalDate(weekStart);
     const end = parseLocalDate(weekEnd);
 
@@ -63,7 +66,7 @@ export default function Receipts() {
     });
 
     await Promise.all(matchingLessons.map(async (lesson) => {
-      await base44.entities.Lesson.update(lesson.id, {
+      await lessonService.update(lesson.id, {
         ...lesson,
         payment_status: 'paid',
       });
@@ -75,7 +78,7 @@ export default function Receipts() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const payload = sanitizeReceiptPayload(data);
-      const receipt = await base44.entities.Receipt.create(payload);
+      const receipt = await receiptService.create(payload);
 
       if (!receipt) {
         throw new Error('Não foi possível criar o recibo. Verifique autenticação e políticas do Supabase.');
@@ -103,7 +106,7 @@ export default function Receipts() {
         if (index >= 0) paymentHistory[index] = paymentEntry;
         else paymentHistory.push(paymentEntry);
 
-        await base44.entities.Student.update(student.id, {
+        await studentService.update(student.id, {
           ...student,
           payment_history: paymentHistory,
           payment_status: 'paid',
@@ -114,7 +117,7 @@ export default function Receipts() {
         queryClient.invalidateQueries({ queryKey: ['students'] });
       }
 
-      await base44.entities.Transaction.create({
+      await transactionService.create({
         type: "income",
         category: "lesson_payment",
         amount: payload.amount,
@@ -135,7 +138,7 @@ export default function Receipts() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Receipt.delete(id),
+    mutationFn: (id) => receiptService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['receipts']);
     },

@@ -56,7 +56,7 @@ Deno.serve(async (request: Request) => {
   if (callerProfileError) return reply(request, 500, { error: 'Não foi possível verificar as permissões.' });
   if (callerProfile?.role !== 'admin') return reply(request, 403, { error: 'Acesso restrito: apenas administradores.' });
 
-  let body: { email?: string; name?: string };
+  let body: { email?: string; name?: string; account_type?: 'individual' | 'studio' };
   try {
     body = await request.json();
   } catch {
@@ -65,6 +65,10 @@ Deno.serve(async (request: Request) => {
 
   const emailToGrant = body.email?.trim()?.toLowerCase();
   if (!emailToGrant) return reply(request, 400, { error: 'E-mail é obrigatório.' });
+  const accountType = body.account_type ?? 'individual';
+  if (!['individual', 'studio'].includes(accountType)) {
+    return reply(request, 400, { error: 'Tipo de conta inválido.' });
+  }
 
   // ── Passo 1: localizar ou criar a conta no Auth ──────────────────────────
 
@@ -91,7 +95,10 @@ Deno.serve(async (request: Request) => {
       // Não existe ainda: cria a conta e envia convite para definir senha
       const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(emailToGrant, {
         redirectTo: appUrl ? `${appUrl}/definir-senha` : undefined,
-        data: { full_name: body.name?.trim() || emailToGrant.split('@')[0] },
+        data: {
+          full_name: body.name?.trim() || emailToGrant.split('@')[0],
+          account_type: accountType,
+        },
       });
 
       if (inviteError) {

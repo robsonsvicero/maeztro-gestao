@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { base44 } from "@/api/base44Client";
-import { supabase } from "@/api/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
+import { profileService } from "@/modules/auth/services/profileService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
+import { storageService } from "@/modules/shared/services/storageService";
 import { getSubscriptionPlans, isGooglePlayBillingAvailable, openSubscriptionManagement, purchaseSubscription } from "@/services/billing/googlePlayBilling";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +48,7 @@ export default function Settings() {
   const [legalConsent, setLegalConsent] = useState(null);
   const { data: settings = [], isLoading: _isLoading } = useQuery({
     queryKey: ['appSettings'],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => appSettingsService.list(),
   });
 
   const [formData, setFormData] = useState({
@@ -71,31 +73,17 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        await base44.auth.me();
-      } catch {
-        console.error("Error loading user:");
-      }
-    };
-
-    loadCurrentUser();
-  }, []);
-
-  useEffect(() => {
     const loadLegalConsent = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!user) return;
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('legal_documents_version, legal_documents_accepted_at')
-        .eq('id', user.id)
-        .maybeSingle();
-      setLegalConsent(data || null);
+      setLegalConsent(await profileService.getLegalConsent(user.id));
     };
 
-    loadLegalConsent();
+    loadLegalConsent().catch((error) => {
+      console.error('Erro ao carregar o aceite dos documentos:', error);
+    });
   }, []);
 
   useEffect(() => {
@@ -182,7 +170,7 @@ export default function Settings() {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await storageService.uploadLogo(file);
       setFormData({ ...formData, logo_url: file_url });
       // Limpar o input file
       e.target.value = "";
@@ -206,20 +194,15 @@ export default function Settings() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw userError || new Error('Sessão inválida.');
 
-      const { data: existingRows, error: rowsError } = await supabase
-        .from('app_settings')
-        .select('id')
-        .limit(10);
+      const existingRows = await appSettingsService.list();
 
-      if (rowsError) throw rowsError;
-
-      const targetRow = settings[0] ?? existingRows?.[0];
+      const targetRow = settings[0] ?? existingRows[0];
 
       if (targetRow?.id) {
-        return base44.entities.AppSettings.update(targetRow.id, data);
+        return appSettingsService.update(targetRow.id, data);
       }
 
-      return base44.entities.AppSettings.create(data);
+      return appSettingsService.create(data);
     },
     onSuccess: (savedSettings) => {
       setSaveFeedback({ type: "success", message: "Configurações salvas com sucesso!" });

@@ -16,5 +16,8 @@ verify_jwt = false
 [functions.send-email]
 verify_jwt = false
 
+[functions.run-automations]
+verify_jwt = false
+
 [functions.sync-recurrence]
 verify_jwt = false

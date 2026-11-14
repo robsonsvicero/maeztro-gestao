@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { TrendingUp } from "lucide-react";
 import { format, startOfMonth, addDays } from "date-fns";
 import { useTheme } from "@/lib/ThemeContext";
+import { parseLocalDate } from "@/utils/dateUtils";
 
 export default function MonthlyChart({ transactions }) {
   const { theme } = useTheme();
@@ -14,7 +15,7 @@ export default function MonthlyChart({ transactions }) {
     for (let i = 0; i < 30; i++) {
       const day = addDays(start, i);
       const dayTransactions = transactions.filter(t => 
-        format(new Date(t.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+        format(parseLocalDate(t.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
       );
 
       days.push({

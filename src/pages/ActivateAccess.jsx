@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/api/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { getSubscriptionPlans, isGooglePlayBillingAvailable, purchaseSubscription, restoreSubscriptions } from '@/services/billing/googlePlayBilling';
 import { Button } from '@/components/ui/button';

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { supabase } from "@/api/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
+import { profileService } from "@/modules/auth/services/profileService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
 import {
   LayoutDashboard,
   Wallet,
@@ -14,7 +16,10 @@ import {
   Sparkles,
   KeyRound,
   MoreHorizontal,
-  Power
+  Power,
+  Building2,
+  Workflow,
+  ContactRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +40,7 @@ import { ThemeSwitch } from "@/components/ui/theme-switch";
 import { useAuth } from "@/lib/AuthContext";
 import LessonReminder from "@/components/schedule/LessonReminder";
 import LegalConsentGate from "@/components/legal/LegalConsentGate";
+import WorkspaceSwitcher from "@/components/workspaces/WorkspaceSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,12 +49,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navigationItems = [
-  { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
-  { title: "Agenda", url: createPageUrl("Schedule"), icon: Calendar },
-  { title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles },
-  { title: "Finanças", url: createPageUrl("Finances"), icon: Wallet },
-  { title: "Alunos", url: createPageUrl("Students"), icon: Users },
-  { title: "Recibos", url: createPageUrl("Receipts"), icon: ReceiptIcon },
+  { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard, roles: ['owner'] },
+  { title: "Agenda", url: createPageUrl("Schedule"), icon: Calendar, roles: ['owner', 'teacher'] },
+  { title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles, roles: ['owner', 'teacher'] },
+  { title: "Automações", url: createPageUrl("Automations"), icon: Workflow, roles: ['owner', 'teacher'] },
+  { title: "CRM", url: createPageUrl("CRM"), icon: ContactRound, roles: ['owner'] },
+  { title: "Finanças", url: createPageUrl("Finances"), icon: Wallet, roles: ['owner', 'finance'] },
+  { title: "Alunos", url: createPageUrl("Students"), icon: Users, roles: ['owner', 'teacher'] },
+  { title: "Recibos", url: createPageUrl("Receipts"), icon: ReceiptIcon, roles: ['owner'] },
+  { title: "Estúdio", url: createPageUrl("Workspace"), icon: Building2, roles: ['owner', 'teacher', 'finance'] },
 ];
 
 function NavigationLink({ to, children, className }) {
@@ -76,7 +85,7 @@ function NavigationLink({ to, children, className }) {
 export default function Layout({ children, currentPageName: _currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { accessType, accessEndsAt } = useAuth();
+  const { accessType, accessEndsAt, workspaceRole, accountType, isAdmin } = useAuth();
   const [user, setUser] = useState(null);
   const [appSettings, setAppSettings] = useState(null);
 
@@ -118,13 +127,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
       }
 
       if (authUser) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', authUser.id)
-          .maybeSingle();
-
-        if (profileError && profileError.status !== 401) throw profileError;
+        const profile = await profileService.getById(authUser.id);
 
         setUser({
           ...authUser,
@@ -133,13 +136,8 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
         });
       }
 
-      const { data: settings, error: settingsError } = await supabase
-        .from('app_settings')
-        .select('*')
-        .limit(1);
-
-      if (settingsError && settingsError.status !== 401) throw settingsError;
-      if (settings && settings.length > 0) setAppSettings(settings[0]);
+      const settings = await appSettingsService.list();
+      if (settings.length > 0) setAppSettings(settings[0]);
     } catch (error) {
       if (error?.status !== 401 && error?.name !== 'AuthSessionMissingError') {
         console.error("Error loading data:", error);
@@ -159,18 +157,45 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
   const showExpiryAlert = accessType !== 'lifetime' && accessType && accessDaysRemaining !== null && accessDaysRemaining <= 4;
   const accessLabel = accessType === 'trial' ? 'Seu teste gratuito' : 'Sua assinatura';
   const accessAction = accessType === 'trial' ? 'Assine o MAEZTRO Gestão para continuar acessando após esse período.' : 'Renove sua assinatura para não perder o acesso.';
-  const primaryNavItems = [
-    { title: 'Dashboard', url: createPageUrl('Dashboard'), icon: LayoutDashboard },
-    { title: 'Agenda', url: createPageUrl('Schedule'), icon: Calendar },
-    { type: 'more', title: 'Mais', icon: MoreHorizontal },
-    { title: 'Finanças', url: createPageUrl('Finances'), icon: Wallet },
-    { title: 'Alunos', url: createPageUrl('Students'), icon: Users },
-  ];
-
+  const navigationRole = isAdmin ? 'owner' : workspaceRole;
+  const primaryNavItems = navigationRole === 'finance'
+    ? [
+      { title: 'Finanças', url: createPageUrl('Finances'), icon: Wallet },
+      { type: 'more', title: 'Mais', icon: MoreHorizontal },
+    ]
+    : navigationRole === 'teacher'
+      ? [
+        { title: 'Agenda', url: createPageUrl('Schedule'), icon: Calendar },
+        { type: 'more', title: 'Mais', icon: MoreHorizontal },
+        { title: 'Alunos', url: createPageUrl('Students'), icon: Users },
+      ]
+      : [
+        { title: 'Dashboard', url: createPageUrl('Dashboard'), icon: LayoutDashboard },
+        { title: 'Agenda', url: createPageUrl('Schedule'), icon: Calendar },
+        { type: 'more', title: 'Mais', icon: MoreHorizontal },
+        { title: 'Finanças', url: createPageUrl('Finances'), icon: Wallet },
+        { title: 'Alunos', url: createPageUrl('Students'), icon: Users },
+      ];
   const moreNavItems = [
-    { title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles },
-    { title: "Recibos", url: createPageUrl("Receipts"), icon: ReceiptIcon },
-    ...(user?.role === 'admin' ? [{ title: "Licenças", url: createPageUrl("AdminLicenses"), icon: KeyRound }] : [])
+    ...(navigationRole === 'owner'
+      ? [{ title: "CRM", url: createPageUrl("CRM"), icon: ContactRound }]
+      : []),
+    ...(navigationRole === 'owner' || navigationRole === 'teacher'
+      ? [{ title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles }]
+      : []),
+    ...(navigationRole === 'owner' || navigationRole === 'teacher'
+      ? [{ title: "Automações", url: createPageUrl("Automations"), icon: Workflow }]
+      : []),
+    ...(navigationRole === 'owner'
+      ? [{ title: "Recibos", url: createPageUrl("Receipts"), icon: ReceiptIcon }]
+      : []),
+    ...((accountType === 'studio' || isAdmin)
+      ? [{ title: "Estúdio", url: createPageUrl("Workspace"), icon: Building2 }]
+      : []),
+    ...(navigationRole === 'owner'
+      ? [{ title: "Configurações", url: createPageUrl("Settings"), icon: Settings }]
+      : []),
+    ...(isAdmin ? [{ title: "Licenças", url: createPageUrl("AdminLicenses"), icon: KeyRound }] : [])
   ];
 
   return (
@@ -207,13 +232,17 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
               
               <SidebarTrigger className="h-8 w-8 shrink-0 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50" />
             </div>
+            <WorkspaceSwitcher />
           </SidebarHeader>
           
           <SidebarContent className="p-3">
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu className="items-center">
-                  {navigationItems.map((item) => {
+                  {navigationItems.filter((item) => (
+                    (isAdmin || item.roles.includes(workspaceRole))
+                    && (item.title !== 'Estúdio' || isAdmin || accountType === 'studio')
+                  )).map((item) => {
                     const isActive = location.pathname === item.url;
                     return (
                       <SidebarMenuItem key={item.title} className="w-full">
@@ -233,7 +262,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
                       </SidebarMenuItem>
                     );
                   })}
-                  <SidebarMenuItem className="w-full">
+                  {navigationRole === 'owner' && <SidebarMenuItem className="w-full">
                     <SidebarMenuButton 
                       asChild 
                       className={`rounded-xl transition-all duration-200 mb-1 ${
@@ -247,8 +276,8 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
                         <span className="font-medium">Configurações</span>
                       </NavigationLink>
                     </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  {user?.role === 'admin' && (
+                  </SidebarMenuItem>}
+                  {isAdmin && (
                     <SidebarMenuItem className="w-full">
                       <SidebarMenuButton
                         asChild
@@ -313,7 +342,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
           <header className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 lg:hidden no-print">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <Link to={createPageUrl("Settings")} className="shrink-0 transition-transform hover:scale-105">
+                <Link to={createPageUrl(navigationRole === 'owner' ? 'Settings' : 'Workspace')} className="shrink-0 transition-transform hover:scale-105">
                   {appSettings?.logo_url ? (
                     <img
                       src={appSettings.logo_url}
@@ -341,6 +370,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
                 <Power className="h-5 w-5" />
               </Button>
             </div>
+            <WorkspaceSwitcher showSingle={false} />
           </header>
 
           <div className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 pb-[calc(5.25rem+env(safe-area-inset-bottom))] dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 lg:pb-0">

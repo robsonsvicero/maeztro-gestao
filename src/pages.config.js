@@ -6,6 +6,8 @@ import Students from './pages/Students';
 import Settings from './pages/Settings';
 import Schedule from './pages/Schedule';
 import AutoSchedule from './pages/AutoSchedule';
+import Automations from './pages/Automations';
+import CRM from './pages/CRM';
 import Budget from './pages/Budget';
 import Login from './pages/Login';
 import ActivateAccess from './pages/ActivateAccess';
@@ -13,6 +15,7 @@ import AdminLicenses from './pages/AdminLicenses';
 import FreeTrial from './pages/FreeTrial';
 import SetPassword from './pages/SetPassword';
 import FirstAccess from './pages/FirstAccess';
+import Workspace from './pages/Workspace';
 import Outros from './pages/Outros';
 import __Layout from './Layout.jsx';
 
@@ -25,6 +28,8 @@ export const PAGES = {
     "Settings": Settings,
     "Schedule": Schedule,
     "AutoSchedule": AutoSchedule,
+    "Automations": Automations,
+    "CRM": CRM,
     "Budget": Budget,
     "Login": Login,
     "ActivateAccess": ActivateAccess,
@@ -33,6 +38,7 @@ export const PAGES = {
     "SetPassword": SetPassword,
     "FirstAccess": FirstAccess,
     "Outros": Outros,
+    "Workspace": Workspace,
 }
 
 export const pagesConfig = {

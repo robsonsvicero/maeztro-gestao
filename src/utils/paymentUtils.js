@@ -51,17 +51,60 @@ export const getWeekStartKey = (value) => {
   return getLocalDateString(normalized);
 };
 
-export const getLessonPaymentStatus = (student, lesson) => {
+export const buildWeeklyPaymentWeeks = (createdDate, referenceDate = new Date(), count = 12) => {
+  const reference = new Date(referenceDate);
+  const enrollmentDate = createdDate ? parseLocalDate(createdDate) : new Date(referenceDate);
+  if (Number.isNaN(reference.getTime())) {
+    throw new Error('Data de referência inválida para gerar as semanas de pagamento.');
+  }
+  if (Number.isNaN(enrollmentDate.getTime())) {
+    throw new Error('Data de matrícula inválida para gerar as semanas de pagamento.');
+  }
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error('A quantidade de semanas deve ser um inteiro não negativo.');
+  }
+
+  const currentWeek = parseLocalDate(getWeekStartKey(reference));
+  const firstWeek = parseLocalDate(getWeekStartKey(enrollmentDate));
+  const start = firstWeek > currentWeek ? firstWeek : currentWeek;
+
+  return Array.from({ length: count }, (_, index) => {
+    const weekStart = new Date(start);
+    weekStart.setDate(start.getDate() + index * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    return {
+      weekStart: getLocalDateString(weekStart),
+      weekEnd: getLocalDateString(weekEnd),
+      weekStartDate: weekStart,
+    };
+  });
+};
+
+export const getLessonPaymentStatus = (student, lesson, referenceDate = new Date()) => {
   if (!student) return 'pending';
 
   if (student.payment_type === 'weekly') {
     const weekStart = getWeekStartKey(lesson?.date || lesson?.lesson_date);
+    if (!weekStart) return 'pending';
+
     const history = Array.isArray(student.payment_history) ? student.payment_history : [];
-    const paidWeek = history.some((entry) => entry?.period === 'week' && entry?.week_start === weekStart && entry?.status === 'paid');
-    return paidWeek ? 'paid' : 'pending';
+    if (history.some((entry) => entry?.period === 'week' && entry?.week_start === weekStart && entry?.status === 'paid')) {
+      return 'paid';
+    }
+    if (history.some((entry) => entry?.period === 'week' && entry?.week_start === weekStart && entry?.status === 'canceled')) {
+      return 'canceled';
+    }
+
+    const weekEnd = parseLocalDate(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const today = new Date(referenceDate);
+    today.setHours(0, 0, 0, 0);
+    return weekEnd < today ? 'overdue' : 'pending';
   }
 
-  return getPaymentStatus(student.next_payment_date, student.last_payment_date);
+  return getPaymentStatus(student.next_payment_date, student.payment_history, referenceDate);
 };
 
 /**
@@ -77,13 +120,13 @@ export const getNextPaymentDate = (paymentDay, paymentStatus = 'pending', paymen
 
   const baseDate = new Date(referenceDate);
   baseDate.setHours(0, 0, 0, 0);
+  const history = Array.isArray(paymentHistory) ? paymentHistory : [];
   
-  // Função auxiliar para verificar se um mês está pago
-  const isMonthPaid = (month, year) => {
-    return paymentHistory.some((entry) => {
+  const isMonthSettled = (month, year) => {
+    return history.some((entry) => {
       const entryMonth = Number(entry.month);
       const entryYear = Number(entry.year);
-      return entryMonth === month && entryYear === year && entry.status === 'paid';
+      return entryMonth === month && entryYear === year && ['paid', 'canceled'].includes(entry.status);
     });
   };
 
@@ -93,25 +136,14 @@ export const getNextPaymentDate = (paymentDay, paymentStatus = 'pending', paymen
 
   // Limitar a busca a 24 meses à frente para evitar loops infinitos
   for (let i = 0; i < 24; i++) {
-    // Verificar se este mês está pago
-    const isPaid = isMonthPaid(currentMonth, currentYear);
+    // Verificar se este mês já foi pago ou cancelado
+    const isSettled = isMonthSettled(currentMonth, currentYear);
 
-    if (!isPaid) {
-      // Encontrou um mês não pago
+    if (!isSettled) {
       const targetDate = new Date(currentYear, currentMonth - 1, 1);
       const lastDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
       const effectiveDay = Math.min(day, lastDayOfMonth);
       const dueDate = new Date(currentYear, currentMonth - 1, effectiveDay);
-
-      // Se a data calculada está no passado, avançar para o próximo mês
-      if (dueDate < baseDate) {
-        currentMonth++;
-        if (currentMonth > 12) {
-          currentMonth = 1;
-          currentYear++;
-        }
-        continue;
-      }
 
       return getLocalDateString(dueDate);
     }
@@ -133,25 +165,27 @@ export const getNextPaymentDate = (paymentDay, paymentStatus = 'pending', paymen
 };
 
 /**
- * Calcula o status de pagamento baseado na próxima data de vencimento
- * Se o vencimento é menor que hoje = em atraso = PENDING
- * Se o vencimento é >= hoje = em dia = PAID
+ * Calcula o status da cobrança sem confundir vencimento futuro com pagamento.
  */
-export const getPaymentStatus = (nextPaymentDate, lastPaymentDate = null) => {
+export const getPaymentStatus = (nextPaymentDate, paymentHistory = [], referenceDate = new Date()) => {
+  const history = Array.isArray(paymentHistory) ? paymentHistory : [];
+  const currentMonthEntries = history.filter((entry) => (
+    Number(entry?.month) === referenceDate.getMonth() + 1
+      && Number(entry?.year) === referenceDate.getFullYear()
+  ));
+
+  if (currentMonthEntries.some((entry) => entry.status === 'paid')) return 'paid';
+  if (currentMonthEntries.some((entry) => entry.status === 'canceled')) return 'canceled';
+
   if (!nextPaymentDate) {
     return 'pending';
   }
 
-  const today = new Date();
+  const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
   const dueDate = parseLocalDate(nextPaymentDate);
+  if (Number.isNaN(dueDate.getTime())) return 'pending';
   dueDate.setHours(0, 0, 0, 0);
 
-  // Se o próximo vencimento é no futuro ou hoje = está em dia
-  if (dueDate >= today) {
-    return 'paid';
-  }
-
-  // Se o próximo vencimento passou = está em atraso
-  return 'pending';
+  return dueDate < today ? 'overdue' : 'pending';
 };

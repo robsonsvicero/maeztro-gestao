@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getNextPaymentDate, getPaymentStatus } from "@/utils/paymentUtils";
 import { generateAutomaticLessons, deleteFutureLessons, getLessonDayOfWeek, rescheduleFutureLessons } from "@/utils/lessonUtils";
 import { getLocalDateString, parseLocalDate } from "@/utils/dateUtils";
+import { transactionService, receiptService } from "@/modules/finance/services/financeService";
+import { lessonService } from "@/modules/lessons/services/lessonService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
+import { studentService } from "@/modules/students/services/studentService";
+import { automationService } from "@/modules/automations/automationService";
+import { useAuth } from "@/lib/AuthContext";
 
 import StudentForm from "../components/students/StudentForm";
 import StudentCard from "../components/students/StudentCard";
@@ -19,6 +24,8 @@ import ReceiptPreview from "../components/receipts/ReceiptPreview";
 import RescheduleModal from "../components/students/RescheduleModal";
 
 export default function Students() {
+  const { workspaceRole, activeWorkspaceId, userId } = useAuth();
+  const canManageFinancials = workspaceRole === 'owner';
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [selectedStudentForFees, setSelectedStudentForFees] = useState(null);
@@ -31,19 +38,25 @@ export default function Students() {
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list('-created_date'),
+    queryFn: () => studentService.list('-created_date'),
   });
 
   const { data: appSettings = [] } = useQuery({
     queryKey: ['appSettings'],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => appSettingsService.list(),
+  });
+
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['workspaceTeachers', activeWorkspaceId],
+    queryFn: () => automationService.listAssignableMembers(),
+    enabled: Boolean(activeWorkspaceId),
   });
 
   const settings = appSettings[0] || {};
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const created = await base44.entities.Student.create(data);
+      const created = await studentService.create(data);
       if (!created) {
         throw new Error('Não foi possível salvar o aluno. Verifique a sessão e as permissões do Supabase.');
       }
@@ -54,7 +67,7 @@ export default function Students() {
       if (createdStudent.lesson_day && createdStudent.lesson_time && createdStudent.student_status === 'active') {
         try {
           const durationMinutes = Number(settings.default_lesson_duration) || 60;
-          const createdLessons = await generateAutomaticLessons(createdStudent, base44, durationMinutes);
+          const createdLessons = await generateAutomaticLessons(createdStudent, lessonService, durationMinutes);
           queryClient.invalidateQueries({ queryKey: ['lessons'] });
           toast.success(`Aluno salvo e ${createdLessons.length} aulas agendadas automaticamente!`);
         } catch (error) {
@@ -77,7 +90,7 @@ export default function Students() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      const updated = await base44.entities.Student.update(id, data);
+      const updated = await studentService.update(id, data);
       if (!updated) {
         throw new Error('Não foi possível atualizar o aluno. Verifique a sessão e as permissões do Supabase.');
       }
@@ -97,7 +110,7 @@ export default function Students() {
 
   const deleteMutation = useMutation({
     mutationFn: async (student) => {
-      const updated = await base44.entities.Student.update(student.id, {
+      const updated = await studentService.update(student.id, {
         student_status: 'inactive',
         student_state: 'archived',
       });
@@ -106,7 +119,7 @@ export default function Students() {
         throw new Error('Não foi possível arquivar o aluno. Verifique as permissões do Supabase.');
       }
 
-      const deletedFutureLessons = await deleteFutureLessons(student.id, base44);
+      const deletedFutureLessons = await deleteFutureLessons(student.id, lessonService);
 
       return { updated, deletedFutureLessons };
     },
@@ -141,24 +154,26 @@ export default function Students() {
 
     // Se mudou de ativo para inativo, deletar aulas futuras
     if (wasActive && isNowInactive) {
-      deleteFutureLessons(editingStudent.id, base44).then((deletedCount) => {
+      deleteFutureLessons(editingStudent.id, lessonService).then((deletedCount) => {
         if (deletedCount > 0) {
           toast.info(`${deletedCount} aula(s) futura(s) cancelada(s)`);
           queryClient.invalidateQueries({ queryKey: ['lessons'] });
         }
       }).catch((error) => {
         console.error('Erro ao deletar aulas:', error);
+        toast.error(error?.message || 'Não foi possível cancelar as aulas futuras.');
       });
     }
 
     // Se mudou de inativo para ativo, criar novas aulas
     if (!wasActive && data.student_status === 'active' && data.lesson_day && data.lesson_time) {
       const durationMinutes = Number(settings.default_lesson_duration) || 60;
-      generateAutomaticLessons({ ...data, id: editingStudent.id }, base44, durationMinutes).then((createdLessons) => {
+      generateAutomaticLessons({ ...data, id: editingStudent.id }, lessonService, durationMinutes).then((createdLessons) => {
         queryClient.invalidateQueries({ queryKey: ['lessons'] });
         toast.success(`${createdLessons.length} aulas agendadas automaticamente!`);
       }).catch((error) => {
         console.error('Erro ao agendar aulas:', error);
+        toast.error(error?.message || 'Não foi possível agendar as aulas automaticamente.');
       });
     }
 
@@ -185,7 +200,7 @@ export default function Students() {
         rescheduleStudent,
         newDay,
         newTime,
-        base44,
+        { lessonService, studentService },
         durationMinutes,
       );
       // refetchQueries força recarregamento imediato dos dados do servidor
@@ -218,7 +233,7 @@ export default function Students() {
       status: 'paid',
     };
 
-    const createdReceipt = await base44.entities.Receipt.create(receiptPayload);
+    const createdReceipt = await receiptService.create(receiptPayload);
 
     return createdReceipt;
   };
@@ -251,7 +266,7 @@ export default function Students() {
     );
 
     // Recalcular o status de pagamento
-    const paymentStatus = getPaymentStatus(nextPaymentDate, today);
+    const paymentStatus = getPaymentStatus(nextPaymentDate, paymentHistory);
 
     const updatedStudent = {
       ...student,
@@ -262,7 +277,7 @@ export default function Students() {
     };
 
     const monthLabel = new Date(new Date().getFullYear(), monthNumber - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    await base44.entities.Transaction.create({
+    await transactionService.create({
       type: 'income',
       category: 'monthly_payment',
       amount: Number(student.monthly_payment || 0),
@@ -275,7 +290,7 @@ export default function Students() {
       payment_year: String(new Date().getFullYear()),
     });
 
-    await base44.entities.Student.update(student.id, updatedStudent);
+    await studentService.update(student.id, updatedStudent);
     queryClient.invalidateQueries(['students']);
     return updatedStudent;
   };
@@ -297,7 +312,7 @@ export default function Students() {
   const syncWeeklyLessonsPaymentStatus = async (student, week, status = 'paid') => {
     if (!student?.id || !week?.weekStart || !week?.weekEnd) return;
 
-    const lessons = await base44.entities.Lesson.list();
+    const lessons = await lessonService.list();
     const start = parseLocalDate(week.weekStart);
     const end = parseLocalDate(week.weekEnd);
 
@@ -310,7 +325,7 @@ export default function Students() {
     });
 
     await Promise.all(matchingLessons.map(async (lesson) => {
-      await base44.entities.Lesson.update(lesson.id, {
+      await lessonService.update(lesson.id, {
         ...lesson,
         payment_status: status,
       });
@@ -320,7 +335,7 @@ export default function Students() {
   };
 
   const createWeeklyReceiptForStudent = async (student, week, paymentDate = getLocalDateString(), paymentMethod = 'pix') => {
-    return base44.entities.Receipt.create({
+    return receiptService.create({
       receipt_number: `REC-${Date.now()}`,
       student_id: student.id,
       student_name: student.full_name,
@@ -348,7 +363,7 @@ export default function Students() {
     if (existingIndex >= 0) paymentHistory[existingIndex] = paymentEntry;
     else paymentHistory.push(paymentEntry);
 
-    await base44.entities.Transaction.create({
+    await transactionService.create({
       type: 'income',
       category: 'lesson_payment',
       amount: Number(student.weekly_payment || 0),
@@ -359,7 +374,7 @@ export default function Students() {
       student_id: student.id,
     });
 
-    const updatedStudent = await base44.entities.Student.update(student.id, {
+    const updatedStudent = await studentService.update(student.id, {
       payment_history: paymentHistory,
       payment_status: 'paid',
       last_payment_date: today,
@@ -407,7 +422,7 @@ export default function Students() {
         : null,
     };
 
-    await base44.entities.Student.update(student.id, updatedStudent);
+    await studentService.update(student.id, updatedStudent);
     queryClient.invalidateQueries(['students']);
     setSelectedStudentForFees(updatedStudent);
     toast.success('Pagamento removido. Mensalidade voltou para aberto.');
@@ -535,6 +550,10 @@ export default function Students() {
             student={editingStudent}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
+            canEditFinancialFields={canManageFinancials}
+            teachers={teachers}
+            currentUserId={userId}
+            workspaceRole={workspaceRole}
             onCancel={() => {
               setShowForm(false);
               setEditingStudent(null);
@@ -590,8 +609,8 @@ export default function Students() {
               student={student}
               onEdit={() => handleEdit(student)}
               onDelete={() => handleDelete(student)}
-              onRegisterPayment={() => handleRegisterPayment(student)}
-              onOpenMonthlyFees={() => setSelectedStudentForFees(student)}
+              onOpenMonthlyFees={canManageFinancials ? () => setSelectedStudentForFees(student) : undefined}
+              showFinancialInfo={canManageFinancials}
               onReschedule={student.lesson_day || student.lesson_time ? () => setRescheduleStudent(student) : undefined}
             />
           ))}

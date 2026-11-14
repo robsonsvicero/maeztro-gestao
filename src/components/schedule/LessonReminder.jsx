@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BellRing, CalendarDays, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
+import { lessonService } from "@/modules/lessons/services/lessonService";
 
 const REMINDER_WINDOW_MINUTES = 15;
 const LATE_WINDOW_MINUTES = 10;
@@ -31,7 +31,7 @@ export default function LessonReminder() {
 
   const { data: lessons = [] } = useQuery({
     queryKey: ["lessons"],
-    queryFn: () => base44.entities.Lesson.list("-date"),
+    queryFn: () => lessonService.list("-date"),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });

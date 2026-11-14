@@ -1,6 +1,4 @@
 import { useMemo, useState } from "react";
-import { supabase } from "@/api/supabaseClient";
-import { base44 } from "@/api/base44Client";
 import { jsPDF } from "jspdf";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -12,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, FileDown, Plus, Search, PencilLine, Trash2 } from "lucide-react";
 import { getLocalDateString, parseLocalDate } from "@/utils/dateUtils";
 import { getNextPaymentDate } from "@/utils/paymentUtils";
+import { transactionService } from "@/modules/finance/services/financeService";
+import { studentService } from "@/modules/students/services/studentService";
+import { useAuth } from "@/lib/AuthContext";
 
 const fallbackTransactions = [];
 
@@ -45,6 +46,8 @@ const emptyTransaction = {
 };
 
 export default function Finances() {
+  const { workspaceRole } = useAuth();
+  const canWriteFinance = workspaceRole === 'owner';
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [formData, setFormData] = useState(emptyTransaction);
@@ -58,19 +61,11 @@ export default function Finances() {
 
   const { data: transactions = fallbackTransactions, isLoading } = useQuery({
     queryKey: ['transactions'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('transaction').select('*').order('date', { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => transactionService.list('-date'),
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const { data: transaction, error } = await supabase.from('transaction').insert(data).select().single();
-      if (error) throw error;
-      return transaction;
-    },
+    mutationFn: (data) => transactionService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       setShowForm(false);
@@ -80,11 +75,7 @@ export default function Finances() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      const { data: transaction, error } = await supabase.from('transaction').update(data).eq('id', id).select().single();
-      if (error) throw error;
-      return transaction;
-    },
+    mutationFn: ({ id, data }) => transactionService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       setShowForm(false);
@@ -95,13 +86,12 @@ export default function Finances() {
 
   const deleteMutation = useMutation({
     mutationFn: async (transaction) => {
-      const { error } = await supabase.from('transaction').delete().eq('id', transaction.id);
-      if (error) throw error;
+      await transactionService.delete(transaction.id);
 
       // Se for mensalidade (receita), reverter o pagamento no histórico do aluno
       if (transaction.type === 'income' && transaction.category === 'monthly_payment' && transaction.student_name) {
         try {
-          const students = await base44.entities.Student.list();
+          const students = await studentService.list();
           const student = transaction.student_id
             ? students.find((s) => s.id === transaction.student_id)
             : students.find((s) => s.full_name === transaction.student_name);
@@ -128,7 +118,7 @@ export default function Finances() {
                 ? filteredHistory.reduce((latest, entry) => entry.paid_at > latest ? entry.paid_at : latest, '')
                 : null;
 
-              await base44.entities.Student.update(student.id, {
+              await studentService.update(student.id, {
                 ...student,
                 payment_history: filteredHistory,
                 next_payment_date: nextPaymentDate,
@@ -344,12 +334,17 @@ export default function Finances() {
             <FileDown className="w-4 h-4 mr-2" />
             Salvar extrato em PDF
           </Button>
-          <Button onClick={openNewTransactionForm} className="bg-gradient-to-r from-[#094C7E] to-[#0A5A94] hover:shadow-lg transition-all">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Transação
-          </Button>
+          {canWriteFinance && (
+            <Button onClick={openNewTransactionForm} className="bg-gradient-to-r from-[#094C7E] to-[#0A5A94] hover:shadow-lg transition-all">
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Transação
+            </Button>
+          )}
         </div>
       </div>
+      {!canWriteFinance && (
+        <p className="text-sm text-slate-500">Acesso somente para leitura neste workspace.</p>
+      )}
 
       <div className="grid w-full gap-4 md:grid-cols-3">
         <Card className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-0 shadow-lg">
@@ -402,7 +397,7 @@ export default function Finances() {
         </div>
       </Card>
 
-      {showForm && (
+      {canWriteFinance && showForm && (
         <Card className="p-6 bg-white dark:bg-slate-800 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="flex items-center justify-between gap-3">
@@ -553,7 +548,7 @@ export default function Finances() {
                         </button>
                       </th>
                     ))}
-                    <th className="px-3 py-3 text-right font-semibold">Ações</th>
+                    {canWriteFinance && <th className="px-3 py-3 text-right font-semibold">Ações</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -567,12 +562,12 @@ export default function Finances() {
                       <td className="max-w-xs px-3 py-3 text-slate-700 dark:text-slate-200">{transaction.description || '—'}</td>
                       <td className="px-3 py-3">{paymentMethodLabels[transaction.payment_method] || transaction.payment_method || '—'}</td>
                       <td className={`whitespace-nowrap px-3 py-3 text-right font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}</td>
-                      <td className="px-3 py-3">
+                      {canWriteFinance && <td className="px-3 py-3">
                         <div className="flex justify-end gap-2">
                           <Button size="icon" variant="outline" onClick={() => openEditTransactionForm(transaction)} className="h-8 w-8"><PencilLine className="h-4 w-4" /></Button>
                           <Button size="icon" variant="outline" onClick={() => { if (window.confirm('Deseja excluir esta transação?')) deleteMutation.mutate(transaction); }} className="h-8 w-8 text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
                         </div>
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>

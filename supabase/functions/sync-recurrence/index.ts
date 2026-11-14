@@ -67,7 +67,10 @@ const buildLessonWindowForStudent = (student: any, referenceDate = new Date(), d
 
     return {
       user_id: student.user_id,
+      workspace_id: student.workspace_id,
       student_id: student.id,
+      teacher_user_id: student.teacher_user_id || null,
+      attendance_status: 'pending',
       student_name: student.full_name,
       date: toDateString(date),
       start_time: student.lesson_time,
@@ -173,6 +176,7 @@ Deno.serve(async (request: Request) => {
           const lessonsToInsert = missingLessons.map((lesson: any) => ({
             ...lesson,
             user_id: student.user_id,
+            workspace_id: student.workspace_id,
           }));
 
           const { error: lessonInsertError } = await admin.from('lesson').insert(lessonsToInsert);
@@ -201,7 +205,8 @@ Deno.serve(async (request: Request) => {
             const { error: updateError } = await admin
               .from('student')
               .update({ payment_history: nextHistory })
-              .eq('id', student.id);
+              .eq('id', student.id)
+              .eq('workspace_id', student.workspace_id);
 
             if (updateError) {
               return reply(500, { error: 'Não foi possível atualizar o histórico mensal do aluno.', details: updateError.message });

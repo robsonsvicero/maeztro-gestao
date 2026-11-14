@@ -19,7 +19,9 @@ const statusConfig = {
 
 const paymentStatusConfig = {
   pending: { label: "Pendente", class: "bg-orange-100 text-orange-800" },
-  paid: { label: "Pago", class: "bg-green-100 text-green-800" }
+  paid: { label: "Pago", class: "bg-green-100 text-green-800" },
+  overdue: { label: "Em atraso", class: "bg-red-100 text-red-800" },
+  canceled: { label: "Cancelado", class: "bg-slate-100 text-slate-800" }
 };
 
 export default function LessonCard({ lesson, onEdit, onDelete, onStatusChange, theme, showDate = false }) {

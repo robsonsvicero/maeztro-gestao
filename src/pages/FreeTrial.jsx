@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/api/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ export default function FreeTrial() {
   const { isAuthenticated, refreshAccess } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [accountType, setAccountType] = useState('individual');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -50,7 +51,10 @@ export default function FreeTrial() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/teste-gratis` },
+      options: {
+        data: { account_type: accountType },
+        emailRedirectTo: `${window.location.origin}/teste-gratis`,
+      },
     });
 
     if (signUpError) {
@@ -94,6 +98,49 @@ export default function FreeTrial() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={submit}>
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-sm font-medium">Como você vai usar o MAEZTRO?</legend>
+              <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                accountType === 'individual'
+                  ? 'border-[#094C7E] bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'
+              }`}>
+                <input
+                  type="radio"
+                  name="account-type"
+                  value="individual"
+                  checked={accountType === 'individual'}
+                  onChange={() => setAccountType('individual')}
+                  className="mt-1 accent-[#094C7E]"
+                />
+                <span className="space-y-1">
+                  <span className="block font-medium text-slate-900 dark:text-slate-100">Professor individual</span>
+                  <span className="block text-sm text-slate-600 dark:text-slate-400">
+                    Para administrar suas aulas sem uma equipe.
+                  </span>
+                </span>
+              </label>
+              <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                accountType === 'studio'
+                  ? 'border-[#094C7E] bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'
+              }`}>
+                <input
+                  type="radio"
+                  name="account-type"
+                  value="studio"
+                  checked={accountType === 'studio'}
+                  onChange={() => setAccountType('studio')}
+                  className="mt-1 accent-[#094C7E]"
+                />
+                <span className="space-y-1">
+                  <span className="block font-medium text-slate-900 dark:text-slate-100">Estúdio</span>
+                  <span className="block text-sm text-slate-600 dark:text-slate-400">
+                    Para trabalhar com uma equipe de até 10 pessoas, incluindo você.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
             <div className="space-y-2">
               <Label htmlFor="trial-email">E-mail</Label>
               <Input

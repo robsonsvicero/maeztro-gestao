@@ -58,10 +58,51 @@ Deno.serve(async (request: Request) => {
   
   if (profileError) return reply(500, { error: 'Could not initialize user profile' });
 
-  const activeEntitlements = (entitlement ?? []).filter((item: any) =>
+  let activeEntitlements = (entitlement ?? []).filter((item: any) =>
     ['active', 'grace_period', 'canceled'].includes(item.status)
     && (!item.access_ends_at || new Date(item.access_ends_at).getTime() > Date.now())
   );
+
+  if (activeEntitlements.length === 0) {
+    const { data: memberships, error: membershipError } = await admin
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .neq('role_key', 'owner');
+
+    if (membershipError) return reply(500, { error: 'Could not verify workspace membership' });
+
+    const workspaceIds = [...new Set((memberships ?? []).map((membership: any) => membership.workspace_id))];
+    if (workspaceIds.length > 0) {
+      const { data: workspaces, error: workspaceError } = await admin
+        .from('workspaces')
+        .select('owner_id')
+        .in('id', workspaceIds);
+
+      if (workspaceError) return reply(500, { error: 'Could not verify workspace owner' });
+
+      const ownerIds = [...new Set((workspaces ?? [])
+        .map((workspace: any) => workspace.owner_id)
+        .filter((ownerId: string) => ownerId !== user.id))];
+
+      if (ownerIds.length > 0) {
+        const { data: ownerEntitlements, error: ownerEntitlementError } = await admin
+          .from('entitlements')
+          .select('access_type, provider, access_ends_at, status, created_at')
+          .in('auth_user_id', ownerIds)
+          .is('revoked_at', null)
+          .order('created_at', { ascending: false });
+
+        if (ownerEntitlementError) return reply(500, { error: 'Could not verify workspace owner entitlement' });
+
+        activeEntitlements = (ownerEntitlements ?? []).filter((item: any) =>
+          ['active', 'grace_period', 'canceled'].includes(item.status)
+          && (!item.access_ends_at || new Date(item.access_ends_at).getTime() > Date.now())
+        );
+      }
+    }
+  }
 
   if (activeEntitlements.length > 0) {
     // Prioridade de acesso: lifetime > subscription > trial

@@ -13,6 +13,14 @@ const calculateEndTime = (startTime, duration = 60) => {
   return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
 };
 
+export const isDuplicateLessonError = (error) => (
+  error?.code === '23505'
+  && (
+    error?.constraint === 'lesson_student_date_start_time_uidx'
+    || error?.message?.includes('lesson_student_date_start_time_uidx')
+  )
+);
+
 /** Converts Portuguese or English weekday names to the JavaScript weekday. */
 export const getLessonDayOfWeek = (lessonDay) => {
   if (typeof lessonDay !== 'string') return undefined;
@@ -64,6 +72,8 @@ export const buildLessonWindowForStudent = (student, referenceDate = new Date(),
 
     return {
       student_id: student.id,
+      teacher_user_id: student.teacher_user_id || null,
+      attendance_status: 'pending',
       student_name: student.full_name,
       date: toDateString(date),
       start_time: student.lesson_time,
@@ -81,9 +91,12 @@ export const buildLessonWindowForStudent = (student, referenceDate = new Date(),
  * Gera 52 agendamentos semanais para um aluno ativo.
  * @returns {Promise<Array>} Aulas criadas
  */
-export const generateAutomaticLessons = async (student, base44, durationMinutes = 60) => {
+export const generateAutomaticLessons = async (student, lessonService, durationMinutes = 60) => {
   if (!student.id || !student.lesson_day || !student.lesson_time || student.student_status !== 'active') {
     return [];
+  }
+  if (!lessonService?.list || !lessonService?.create) {
+    throw new Error('lessonService.list e lessonService.create são obrigatórios para gerar aulas.');
   }
 
   const lessons = buildLessonWindowForStudent(student, new Date(), durationMinutes);
@@ -91,28 +104,40 @@ export const generateAutomaticLessons = async (student, base44, durationMinutes 
     return [];
   }
 
-  const createdLessons = await Promise.all(lessons.map(async (lesson) => {
-    const created = await base44.entities.Lesson.create(lesson);
-    if (!created) throw new Error('Não foi possível criar uma das aulas automáticas.');
-    return created;
+  const existingLessons = await lessonService.list();
+  const lessonKeys = new Set(
+    (Array.isArray(existingLessons) ? existingLessons : [])
+      .filter((lesson) => lesson?.student_id && lesson?.date)
+      .map((lesson) => `${lesson.student_id}:${lesson.date}:${lesson.start_time || ''}`)
+  );
+  const missingLessons = lessons.filter((lesson) => (
+    !lessonKeys.has(`${student.id}:${lesson.date}:${lesson.start_time}`)
+  ));
+
+  const createdLessons = await Promise.all(missingLessons.map(async (lesson) => {
+    try {
+      const created = await lessonService.create(lesson);
+      if (!created) throw new Error('Não foi possível criar uma das aulas automáticas.');
+      return created;
+    } catch (error) {
+      if (isDuplicateLessonError(error)) return null;
+      throw error;
+    }
   }));
 
-  return createdLessons;
+  return createdLessons.filter(Boolean);
 };
 
 /** Deleta todas as aulas de um aluno, futuras ou passadas. */
-export const deleteStudentLessons = async (studentId, base44) => {
-  try {
-    const lessons = await base44.entities.Lesson.list();
-    if (!Array.isArray(lessons)) return 0;
-
-    const matchingLessons = lessons.filter((lesson) => lesson.student_id === studentId);
-    await Promise.all(matchingLessons.map((lesson) => base44.entities.Lesson.delete(lesson.id)));
-    return matchingLessons.length;
-  } catch (error) {
-    console.error('Erro ao buscar aulas para deletar:', error);
-    return 0;
+export const deleteStudentLessons = async (studentId, lessonService) => {
+  if (!lessonService?.list || !lessonService?.delete) {
+    throw new Error('lessonService.list e lessonService.delete são obrigatórios para excluir aulas.');
   }
+
+  const lessons = await lessonService.list();
+  const matchingLessons = lessons.filter((lesson) => lesson.student_id === studentId);
+  await Promise.all(matchingLessons.map((lesson) => lessonService.delete(lesson.id)));
+  return matchingLessons.length;
 };
 
 export const filterFutureLessonsForStudent = (studentId, lessons, referenceDate = new Date()) => {
@@ -129,19 +154,15 @@ export const filterFutureLessonsForStudent = (studentId, lessons, referenceDate 
 };
 
 /** Deleta todas as aulas futuras de um aluno. */
-export const deleteFutureLessons = async (studentId, base44) => {
-  try {
-    const lessons = await base44.entities.Lesson.list();
-    if (!Array.isArray(lessons)) return 0;
-
-    const futureLessons = filterFutureLessonsForStudent(studentId, lessons);
-
-    await Promise.all(futureLessons.map((lesson) => base44.entities.Lesson.delete(lesson.id)));
-    return futureLessons.length;
-  } catch (error) {
-    console.error('Erro ao buscar aulas para deletar:', error);
-    return 0;
+export const deleteFutureLessons = async (studentId, lessonService) => {
+  if (!lessonService?.list || !lessonService?.delete) {
+    throw new Error('lessonService.list e lessonService.delete são obrigatórios para excluir aulas.');
   }
+
+  const lessons = await lessonService.list();
+  const futureLessons = filterFutureLessonsForStudent(studentId, lessons);
+  await Promise.all(futureLessons.map((lesson) => lessonService.delete(lesson.id)));
+  return futureLessons.length;
 };
 
 /**
@@ -150,18 +171,23 @@ export const deleteFutureLessons = async (studentId, base44) => {
  * @param {Object} student - Dados atuais do aluno
  * @param {string} newLessonDay - Novo dia da semana (ex: "segunda-feira")
  * @param {string} newLessonTime - Novo horário (ex: "14:30")
- * @param {Object} base44 - Cliente base44
+ * @param {{lessonService: Object, studentService: Object}} services - Serviços de domínio
  * @param {number} durationMinutes - Duração padrão usada para gerar o bloco
  * @returns {Promise<{deletedCount: number, createdCount: number}>}
  */
-export const rescheduleFutureLessons = async (student, newLessonDay, newLessonTime, base44, durationMinutes = 60) => {
+export const rescheduleFutureLessons = async (student, newLessonDay, newLessonTime, services, durationMinutes = 60) => {
+  const { lessonService, studentService } = services || {};
+  if (!lessonService?.create || !studentService?.update) {
+    throw new Error('lessonService.create e studentService.update são obrigatórios para reagendar aulas.');
+  }
+
   const targetDayOfWeek = getLessonDayOfWeek(newLessonDay);
   if (targetDayOfWeek === undefined) {
     throw new Error('Dia da aula inválido para o reagendamento.');
   }
 
   // 1. Deletar aulas futuras existentes
-  const deletedCount = await deleteFutureLessons(student.id, base44);
+  const deletedCount = await deleteFutureLessons(student.id, lessonService);
 
   // 2. Calcular a data da próxima ocorrência do novo dia da semana
   const today = new Date();
@@ -184,7 +210,7 @@ export const rescheduleFutureLessons = async (student, newLessonDay, newLessonTi
 
   const createdLessons = await Promise.all(
     newLessons.map(async (lesson) => {
-      const created = await base44.entities.Lesson.create(lesson);
+      const created = await lessonService.create(lesson);
       if (!created) throw new Error('Não foi possível criar uma das aulas no reagendamento.');
       return created;
     }),
@@ -198,7 +224,7 @@ export const rescheduleFutureLessons = async (student, newLessonDay, newLessonTi
     lesson_time: newLessonTime,
   };
 
-  const updated = await base44.entities.Student.update(student.id, updatePayload);
+  const updated = await studentService.update(student.id, updatePayload);
   if (!updated) {
     console.error('Student.update retornou null — verifique as políticas RLS da tabela student no Supabase.');
     throw new Error('Não foi possível atualizar o dia/horário do aluno. Verifique as permissões no Supabase.');

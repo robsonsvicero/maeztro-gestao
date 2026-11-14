@@ -26,7 +26,9 @@ const statusConfig = {
 
 const paymentStatusConfig = {
   pending: { label: "Pendente", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200" },
-  paid: { label: "Pago", class: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200" }
+  paid: { label: "Pago", class: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200" },
+  overdue: { label: "Em atraso", class: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200" },
+  canceled: { label: "Cancelado", class: "bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200" }
 };
 
 const HOUR_HEIGHT = 64; // pixels per hour

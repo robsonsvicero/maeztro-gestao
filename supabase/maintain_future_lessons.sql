@@ -1,5 +1,5 @@
 -- Mantém 12 meses de aulas futuras para todos os alunos ativos.
--- Execute este arquivo uma única vez no SQL Editor do Supabase.
+-- Pode ser reexecutado no SQL Editor para atualizar a função e as permissões.
 
 create extension if not exists pg_cron with schema extensions;
 
@@ -12,11 +12,37 @@ alter table public.student
   add column if not exists student_state text not null default 'active'
   check (student_state in ('active', 'archived'));
 
+do $$
+begin
+  if to_regprocedure('public.maintain_future_lessons()') is not null then
+    execute 'revoke execute on function public.maintain_future_lessons() from public, anon, authenticated';
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if exists (
+    select 1
+    from public.lesson
+    where student_id is not null and date is not null and start_time is not null
+    group by student_id, date, start_time
+    having count(*) > 1
+  ) then
+    raise exception 'Há aulas duplicadas por aluno/data/horário. Revise esses registros antes de criar a restrição de unicidade e reexecute o script.';
+  end if;
+end;
+$$;
+
+create unique index if not exists lesson_student_date_start_time_uidx
+  on public.lesson (student_id, date, start_time)
+  where student_id is not null and date is not null and start_time is not null;
+
 create or replace function public.maintain_future_lessons()
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
   student_record record;
@@ -27,7 +53,7 @@ declare
   inserted_count integer;
 begin
   for student_record in
-    select student.id, student.full_name, student.instrument, student.lesson_day, student.lesson_time, student.user_id
+    select student.id, student.full_name, student.instrument, student.lesson_day, student.lesson_time, student.user_id, student.workspace_id, student.teacher_user_id
     from public.student as student
     where student.student_status = 'active'
       and student.lesson_day is not null
@@ -60,6 +86,9 @@ begin
     while scheduled_date <= horizon loop
       insert into public.lesson (
         user_id,
+        workspace_id,
+        teacher_user_id,
+        attendance_status,
         student_id,
         student_name,
         instrument,
@@ -73,6 +102,9 @@ begin
       )
       select
         student_record.user_id,
+        student_record.workspace_id,
+        student_record.teacher_user_id,
+        'pending',
         student_record.id,
         student_record.full_name,
         student_record.instrument,
@@ -88,7 +120,12 @@ begin
         from public.lesson existing_lesson
         where existing_lesson.student_id = student_record.id
           and existing_lesson.date = scheduled_date
-      );
+          and existing_lesson.start_time = student_record.lesson_time
+      )
+
+      on conflict (student_id, date, start_time)
+        where student_id is not null and date is not null and start_time is not null
+        do nothing;
 
       get diagnostics inserted_count = row_count;
       created_count := created_count + inserted_count;
@@ -99,6 +136,8 @@ begin
   return created_count;
 end;
 $$;
+
+revoke execute on function public.maintain_future_lessons() from public, anon, authenticated;
 
 -- Executa todo dia 1, às 06:00 UTC (03:00 em São Paulo).
 select cron.unschedule(jobid)

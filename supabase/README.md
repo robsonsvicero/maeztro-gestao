@@ -55,6 +55,64 @@ Na compra Kiwify aprovada, o webhook cria e convida a conta com o e-mail do
 comprador. O professor define a senha pelo link recebido e acessa tanto o site
 quanto o app futuro com essa mesma conta.
 
+## Fase 4 — CRM
+
+Depois de aplicar `workspaces.sql`, `automations.sql` e
+`maintain_future_lessons.sql`, revise e execute `crm.sql` no SQL Editor do
+Supabase. A migration valida os campos de `public.student` usados na conversão
+e interrompe a execução se a estrutura não for compatível.
+
+## Tipo de conta: Individual e Estúdio
+
+Depois de `workspaces.sql`, revise e execute `account_types.sql`. A migration
+define o tipo comercial no workspace, aplica os limites no banco e preserva os
+dados ao trocar uma conta de Individual para Estúdio. Contas Individual ficam
+limitadas ao proprietário; Estúdio pode ter até 10 membros no total, incluindo
+o proprietário. Workspaces existentes recebem Individual por padrão e podem
+ser reclassificados pelo administrador. O tipo enviado no cadastro de teste é
+aplicado ao workspace padrão.
+
+Publique as Edge Functions atualizadas para habilitar o seletor de tipo nos
+convites administrativos e a edição segura das contas:
+
+```bash
+supabase functions deploy admin-licenses --no-verify-jwt
+supabase functions deploy admin-create-lifetime-license --no-verify-jwt
+```
+
+O administrador da plataforma pode alterar o tipo de qualquer conta pela tela
+de Licenças. A alteração atualiza os workspaces pertencentes ao usuário, sem
+mover ou apagar dados. Os valores comerciais e o produto de cobrança ainda
+precisam ser configurados no provedor de pagamentos antes de cobrar os planos.
+
+O CRM é privado ao proprietário. Professores designados veem na agenda somente
+o horário e o rótulo “Aula experimental”. Após aplicar a migration, publique a
+Edge Function `run-automations` atualizada para habilitar lembretes de retorno.
+Os avisos são internos e aparecem na central de Automações; nenhum contato
+externo é enviado.
+
+Valide com uma conta proprietária e outra de professor: o proprietário deve
+conseguir cadastrar um interessado, registrar contato, agendar uma experimental
+e converter o cadastro; o professor não deve conseguir ler o lead nem o
+histórico, mas deve ver somente horário e rótulo da experimental designada na
+agenda. Confirme também os totais do funil após marcar a aula como realizada e
+o interessado como matriculado.
+
+## Fase 5 — Inteligência de Gestão
+
+Depois de `crm.sql`, revise e execute `intelligence.sql`. Ela adiciona
+`student.expected_end_date`, usada para identificar alunos com encerramento
+previsto nos próximos 15 dias. O campo pode ser preenchido ou atualizado no
+cadastro do aluno.
+
+O Dashboard mantém os valores financeiros registrados e adiciona indicadores
+determinísticos para cobranças, recebimentos previstos, agenda, retornos do CRM
+e encerramentos. A previsão mensal usa o próximo vencimento cadastrado; na
+cobrança semanal, considera uma cobrança por semana com aula marcada, conforme
+o fluxo atual. A disponibilidade individual é apenas uma estimativa, calculada
+com a grade geral do estúdio menos os compromissos atribuídos a cada professor;
+ela não substitui uma grade de disponibilidade por professor.
+
 ## Administração de licenças
 
 Publique `admin-licenses` para habilitar a tela `/AdminLicenses`:

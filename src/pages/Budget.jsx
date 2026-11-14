@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingUp } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { budgetService, transactionService } from "@/modules/finance/services/financeService";
 
 import BudgetForm from "../components/budget/BudgetForm";
 import BudgetChart from "../components/budget/BudgetChart";
@@ -21,32 +21,16 @@ export default function Budget() {
 
   const { data: budgets = [] } = useQuery({
     queryKey: ['budgets'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('budget').select('*');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => budgetService.list(),
   });
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('transaction').select('*');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => transactionService.list(),
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const { data: budget, error } = await supabase
-        .from('budget')
-        .insert(data)
-        .select()
-        .single();
-      if (error) throw error;
-      return budget;
-    },
+    mutationFn: (data) => budgetService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
       setShowForm(false);

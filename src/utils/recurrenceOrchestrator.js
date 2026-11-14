@@ -1,4 +1,4 @@
-import { buildLessonWindowForStudent } from './lessonUtils.js';
+import { buildLessonWindowForStudent, isDuplicateLessonError } from './lessonUtils.js';
 import { buildMissingMonthlyPaymentHistoryEntries } from './paymentUtils.js';
 import { getLocalDateString } from './dateUtils.js';
 
@@ -61,9 +61,13 @@ export const ensureRecurrenceForActiveStudents = async ({
 
     if (missingLessonPayload.length > 0 && lessonsClient) {
       for (const lesson of missingLessonPayload) {
-        const created = await lessonsClient.create(lesson);
-        if (created) {
+        try {
+          const created = await lessonsClient.create(lesson);
+          if (!created) throw new Error('Não foi possível criar uma aula recorrente.');
           createdLessons += 1;
+          lessonKeys.add(`${student.id}:${lesson.date}:${lesson.start_time}`);
+        } catch (error) {
+          if (!isDuplicateLessonError(error)) throw error;
           lessonKeys.add(`${student.id}:${lesson.date}:${lesson.start_time}`);
         }
       }
@@ -103,24 +107,25 @@ export const ensureRecurrenceForActiveStudents = async ({
 };
 
 /**
- * Convenience helper for the browser/front environment, using base44 style API.
+ * Convenience helper for the browser/front environment, using domain services.
  * This helper keeps the same external contract and is easy to consume from a page.
  */
-export const ensureRecurrenceForActiveStudentsFromBase44 = async ({
-  base44,
+export const ensureRecurrenceForActiveStudentsFromServices = async ({
+  lessonService,
+  studentService,
   students = [],
   now = new Date(),
 }) => {
-  if (!base44?.entities?.Lesson?.create || !base44?.entities?.Student?.update || !base44?.entities?.Student?.list) {
-    throw new Error('base44.entities.Lesson.create, Lesson.list e Student.update são obrigatórios para orquestrar recorrência.');
+  if (!lessonService?.create || !lessonService?.list || !studentService?.update) {
+    throw new Error('lessonService.create, lessonService.list e studentService.update são obrigatórios para orquestrar recorrência.');
   }
 
-  const lessons = await base44.entities.Lesson.list();
+  const lessons = await lessonService.list();
   const result = await ensureRecurrenceForActiveStudents({
     students,
     lessons,
-    lessonsClient: base44.entities.Lesson,
-    studentsClient: base44.entities.Student,
+    lessonsClient: lessonService,
+    studentsClient: studentService,
     now,
   });
 

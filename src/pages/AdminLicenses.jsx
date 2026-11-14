@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/api/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, Download, FileText, Plus, RefreshCw, Save, ShieldAlert, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const formatDate = (value) => value ? new Date(value).toLocaleString('pt-BR') : 'Vitalícia';
 const inputDate = (value) => value ? new Date(value).toISOString().slice(0, 10) : '';
@@ -33,14 +34,17 @@ export default function AdminLicenses() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createMessage, setCreateMessage] = useState('');
-  const [form, setForm] = useState({ email: '', name: '' });
+  const [form, setForm] = useState({ email: '', name: '', accountType: 'individual' });
   const [edits, setEdits] = useState({});
+  const [accountTypeEdits, setAccountTypeEdits] = useState({});
   const { data, isLoading, error } = useQuery({ queryKey: ['admin-licenses'], queryFn: () => invokeAdmin() });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin-licenses'] });
 
   const createLicense = useMutation({
     mutationFn: async (values) => {
-      const { data, error } = await supabase.functions.invoke('admin-create-lifetime-license', { body: { email: values.email } });
+      const { data, error } = await supabase.functions.invoke('admin-create-lifetime-license', {
+        body: { email: values.email, name: values.name, account_type: values.accountType },
+      });
       if (error) {
         let realMessage = error.message || 'Não foi possível criar a licença.';
         try {
@@ -52,12 +56,29 @@ export default function AdminLicenses() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (result) => { setForm({ email: '', name: '' }); setCreateError(''); setCreateMessage(result?.message || 'Licença vitalícia criada com sucesso.'); refresh(); },
+    onSuccess: (result) => { setForm({ email: '', name: '', accountType: 'individual' }); setCreateError(''); setCreateMessage(result?.message || 'Licença vitalícia criada com sucesso.'); refresh(); },
     onError: (mutationError) => setCreateError(mutationError.message || 'Não foi possível criar a licença.'),
   });
   const updateLicense = useMutation({
     mutationFn: ({ entitlementId, status, expiresOn }) => invokeAdmin({ action: 'update_license', entitlementId, status, accessEndsAt: endOfDay(expiresOn) }),
     onSuccess: () => { setEdits({}); refresh(); },
+  });
+  const updateAccountType = useMutation({
+    mutationFn: ({ userId, accountType }) => invokeAdmin({
+      action: 'update_account_type',
+      userId,
+      accountType,
+    }),
+    onSuccess: async (_result, { userId }) => {
+      setAccountTypeEdits((previous) => {
+        const next = { ...previous };
+        delete next[userId];
+        return next;
+      });
+      await refresh();
+      toast.success('Tipo de conta atualizado.');
+    },
+    onError: (mutationError) => toast.error(mutationError.message || 'Não foi possível alterar o tipo de conta.'),
   });
   const editFor = (entitlement) => edits[entitlement.id] ?? { status: entitlement.status, expiresOn: inputDate(entitlement.access_ends_at) };
   const changeEdit = (entitlement, change) => setEdits((previous) => ({
@@ -86,6 +107,11 @@ export default function AdminLicenses() {
       };
     });
   });
+  const accountRows = [...new Map(
+    (data?.customers ?? [])
+      .filter((customer) => customer.auth_user_id)
+      .map((customer) => [customer.auth_user_id, customer])
+  ).values()];
 
   const exportToCSV = () => {
     if (!reportRows.length) return;
@@ -114,7 +140,7 @@ export default function AdminLicenses() {
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Licenças</h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">Gerencie licenças manuais, validade e acesso dos professores.</p>
+        <p className="mt-1 text-slate-600 dark:text-slate-400">Gerencie os tipos de conta, licenças e acessos dos usuários.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => setShowReportModal(true)}>
@@ -129,19 +155,73 @@ export default function AdminLicenses() {
       </div>
     </div>
 
-    {showCreate && <Card className="w-full p-4 md:p-6"><h2 className="text-lg font-semibold">Incluir licença vitalícia</h2><p className="mt-1 text-sm text-slate-500">Se o e-mail ainda não tiver uma conta MAEZTRO, ela será criada automaticamente e um convite será enviado ao usuário para definir a senha.</p><form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={(event) => { event.preventDefault(); setCreateError(''); setCreateMessage(''); createLicense.mutate(form); }}>
+    {showCreate && <Card className="w-full p-4 md:p-6"><h2 className="text-lg font-semibold">Incluir licença vitalícia</h2><p className="mt-1 text-sm text-slate-500">Se o e-mail ainda não tiver uma conta MAEZTRO, ela será criada automaticamente e um convite será enviado ao usuário para definir a senha.</p><form className="mt-5 grid gap-4 md:grid-cols-4" onSubmit={(event) => { event.preventDefault(); setCreateError(''); setCreateMessage(''); createLicense.mutate(form); }}>
       <div className="space-y-2"><Label htmlFor="license-email">E-mail *</Label><Input id="license-email" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="professor@exemplo.com" /></div>
       <div className="space-y-2"><Label htmlFor="license-name">Nome (opcional)</Label><Input id="license-name" type="text" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Nome do professor" /></div>
+      <div className="space-y-2"><Label htmlFor="license-account-type">Tipo da conta</Label><select id="license-account-type" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.accountType} onChange={(event) => setForm({ ...form, accountType: event.target.value })}><option value="individual">Professor individual</option><option value="studio">Estúdio</option></select></div>
       <div className="flex flex-wrap items-end gap-3"><Button type="submit" disabled={createLicense.isPending}><CheckCircle2 className="mr-2 h-4 w-4" />{createLicense.isPending ? 'Incluindo...' : 'Incluir licença'}</Button>{createError && <p className="text-sm text-red-600">{createError}</p>}{createMessage && <p className="text-sm text-emerald-700">{createMessage}</p>}</div>
+      <p className="text-xs text-slate-500 md:col-span-4">O tipo escolhido é aplicado ao novo convite. Para contas existentes, altere o tipo na lista de usuários.</p>
     </form></Card>}
 
-    <Card className="w-full p-4"><h2 className="mb-4 text-lg font-semibold">Professores e licenças</h2>{isLoading ? <p className="text-slate-500">Carregando...</p> : <div className="overflow-x-auto"><table className="min-w-[1400px] w-full text-left text-sm"><thead className="border-y bg-slate-50 text-slate-600 dark:bg-slate-900/40"><tr><th className="p-3">Professor</th><th className="p-3">Plano</th><th className="p-3">Status de acesso</th><th className="p-3">Validade</th><th className="p-3">Conta</th><th className="p-3">1º acesso</th><th className="p-3">Aceite dos termos</th><th className="p-3 text-right">Salvar</th></tr></thead><tbody>
+    <Card className="w-full p-4"><h2 className="mb-4 text-lg font-semibold">Usuários e licenças</h2>{isLoading ? <p className="text-slate-500">Carregando...</p> : <div className="overflow-x-auto"><table className="min-w-[1400px] w-full text-left text-sm"><thead className="border-y bg-slate-50 text-slate-600 dark:bg-slate-900/40"><tr><th className="p-3">Usuário</th><th className="p-3">Plano</th><th className="p-3">Status de acesso</th><th className="p-3">Validade</th><th className="p-3">Conta</th><th className="p-3">1º acesso</th><th className="p-3">Aceite dos termos</th><th className="p-3 text-right">Salvar</th></tr></thead><tbody>
       {data?.customers?.flatMap((customer) => (customer.entitlements?.length ? customer.entitlements : [null]).map((entitlement) => {
         const edit = entitlement ? editFor(entitlement) : null;
         return <tr key={entitlement?.id ?? customer.id} className="border-b"><td className="p-3"><p className="font-medium">{customer.name || 'Sem nome'}</p><p className="text-xs text-slate-500">{customer.email}</p></td><td className="p-3">{entitlement ? accessTypeLabel(entitlement.access_type, entitlement.base_plan_id) : '—'}</td><td className="p-3">{entitlement ? <select className="h-9 rounded-md border border-input bg-transparent px-2" value={edit.status} onChange={(event) => changeEdit(entitlement, { status: event.target.value })}>{statuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select> : 'Sem licença'}</td><td className="p-3">{entitlement ? <div className="space-y-1"><Input aria-label="Data de validade; deixe vazio para licença vitalícia" className="w-40" type="date" value={edit.expiresOn} onChange={(event) => changeEdit(entitlement, { expiresOn: event.target.value })} /><p className="text-xs text-slate-500">Atual: {formatDate(entitlement.access_ends_at)}</p></div> : '—'}</td><td className="p-3"><span className="text-emerald-700">Vinculada</span></td><td className="p-3">{customer.first_access_completed ? <div><Badge className="bg-emerald-100 text-emerald-800">Concluído</Badge><p className="mt-1 text-xs text-slate-500">{formatDate(customer.first_access_at)}</p></div> : <Badge className="bg-amber-100 text-amber-800">Pendente</Badge>}</td><td className="p-3">{customer.legal_documents_accepted_at ? <div><Badge className="bg-emerald-100 text-emerald-800">Aceito</Badge><p className="mt-1 text-xs text-slate-500">{formatDate(customer.legal_documents_accepted_at)}</p><p className="text-xs text-slate-400">v{customer.legal_documents_version}</p></div> : <Badge className="bg-amber-100 text-amber-800">Pendente</Badge>}</td><td className="p-3 text-right">{entitlement && <Button size="sm" variant="outline" disabled={updateLicense.isPending} onClick={() => updateLicense.mutate({ entitlementId: entitlement.id, ...edit })}><Save className="mr-1 h-4 w-4" />Salvar</Button>}</td></tr>;
       }))}
       {!data?.customers?.length && <tr><td colSpan="8" className="p-6 text-center text-slate-500">Nenhuma compra ou licença registrada.</td></tr>}
     </tbody></table></div>}</Card>
+
+    <Card className="w-full p-4">
+      <h2 className="mb-1 text-lg font-semibold">Tipo de conta dos usuários</h2>
+      <p className="mb-4 text-sm text-slate-500">A alteração preserva o workspace, os membros e os dados da conta.</p>
+      {isLoading ? <p className="text-slate-500">Carregando usuários...</p> : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[640px] w-full text-left text-sm">
+            <thead className="border-y bg-slate-50 text-slate-600 dark:bg-slate-900/40">
+              <tr><th className="p-3">Usuário</th><th className="p-3">Tipo da conta</th><th className="p-3 text-right">Ação</th></tr>
+            </thead>
+            <tbody>
+              {accountRows.map((customer) => {
+                const accountType = accountTypeEdits[customer.auth_user_id] ?? customer.account_type ?? 'individual';
+                return (
+                  <tr key={customer.auth_user_id} className="border-b">
+                    <td className="p-3">
+                      <p className="font-medium">{customer.name || 'Sem nome'}</p>
+                      <p className="text-xs text-slate-500">{customer.email || 'E-mail não informado'}</p>
+                    </td>
+                    <td className="p-3">
+                      <select
+                        aria-label={`Tipo da conta de ${customer.email || customer.name || 'usuário'}`}
+                        className="h-9 rounded-md border border-input bg-transparent px-2"
+                        value={accountType}
+                        onChange={(event) => setAccountTypeEdits((previous) => ({
+                          ...previous,
+                          [customer.auth_user_id]: event.target.value,
+                        }))}
+                      >
+                        <option value="individual">Professor individual</option>
+                        <option value="studio">Estúdio</option>
+                      </select>
+                    </td>
+                    <td className="p-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!customer.auth_user_id || updateAccountType.isPending || accountType === customer.account_type}
+                        onClick={() => updateAccountType.mutate({ userId: customer.auth_user_id, accountType })}
+                      >
+                        Salvar
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!accountRows.length && <tr><td colSpan="3" className="p-6 text-center text-slate-500">Nenhum usuário encontrado.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
 
     <Card className="w-full p-4"><h2 className="mb-4 text-lg font-semibold">Últimos eventos de assinatura</h2><div className="overflow-x-auto"><table className="min-w-[760px] w-full text-left text-sm"><thead className="border-y bg-slate-50 text-slate-600 dark:bg-slate-900/40"><tr><th className="p-3">Evento</th><th className="p-3">Status</th><th className="p-3">Erro</th><th className="p-3">Registrado em</th></tr></thead><tbody>{data?.events?.map((event) => <tr key={event.id} className="border-b"><td className="p-3 font-medium">{event.event_type}</td><td className="p-3"><Badge className={event.processing_status === 'processed' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>{event.processing_status}</Badge></td><td className="p-3 text-slate-600">{event.processing_error || '—'}</td><td className="p-3">{formatDate(event.created_at)}</td></tr>)}{!data?.events?.length && <tr><td colSpan="4" className="p-6 text-center text-slate-500">Nenhum evento registrado.</td></tr>}</tbody></table></div></Card>
 

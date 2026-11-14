@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileCheck2, Loader2 } from 'lucide-react';
-import { supabase } from '@/api/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LEGAL_DOCUMENT_VERSION } from '@/lib/legalDocuments';

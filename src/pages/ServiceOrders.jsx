@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ServiceOrderList from "../components/serviceOrders/ServiceOrderList";
 import ServiceOrderPreview from "../components/serviceOrders/ServiceOrderPreview";
+import { serviceOrderService } from "@/modules/service-orders/services/serviceOrderService";
+import { companySettingsService } from "@/modules/settings/services/settingsService";
 
 export default function ServiceOrders() {
   const [previewOrder, setPreviewOrder] = useState(null);
@@ -17,16 +18,16 @@ export default function ServiceOrders() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['serviceOrders'],
-    queryFn: () => base44.entities.ServiceOrder.list('-created_date'),
+    queryFn: () => serviceOrderService.list('-created_date'),
   });
 
   const { data: companySettings = [] } = useQuery({
     queryKey: ['companySettings'],
-    queryFn: () => base44.entities.CompanySettings.list(),
+    queryFn: () => companySettingsService.list(),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.ServiceOrder.update(id, data),
+    mutationFn: ({ id, data }) => serviceOrderService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['serviceOrders']);
       setPreviewOrder(null);
@@ -34,7 +35,7 @@ export default function ServiceOrders() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.ServiceOrder.delete(id),
+    mutationFn: (id) => serviceOrderService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['serviceOrders']);
     },

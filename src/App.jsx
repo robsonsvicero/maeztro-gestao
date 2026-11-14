@@ -14,11 +14,27 @@ import { createPageUrl } from '@/utils';
 import PublicHome from '@/pages/PublicHome';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfUse from '@/pages/TermsOfUse';
+import WorkspaceInvite from '@/pages/WorkspaceInvite';
 import { ThemeProvider } from '@/lib/ThemeContext';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+const pageRoles = {
+  Dashboard: ['owner'],
+  Finances: ['owner', 'finance'],
+  Clients: ['owner'],
+  Receipts: ['owner'],
+  Students: ['owner', 'teacher'],
+  Settings: ['owner'],
+  Schedule: ['owner', 'teacher'],
+  AutoSchedule: ['owner', 'teacher'],
+  Automations: ['owner', 'teacher'],
+  CRM: ['owner'],
+  Budget: ['owner'],
+  Outros: ['owner'],
+  Workspace: ['owner', 'teacher', 'finance'],
+};
 
 const AppLoadingScreen = () => (
   <div className="min-h-screen bg-slate-50 p-4 dark:bg-slate-900 md:p-6">
@@ -59,12 +75,40 @@ const AppAccessLoadingScreen = () => (
   </div>
 );
 
+const WorkspaceErrorScreen = ({ error }) => (
+  <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
+    <div className="max-w-lg space-y-3 text-center">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Não foi possível carregar o workspace</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">{error?.message || 'Verifique a configuração do banco de dados.'}</p>
+      <button
+        type="button"
+        className="rounded-md bg-[#094C7E] px-4 py-2 text-sm font-medium text-white"
+        onClick={() => window.location.reload()}
+      >
+        Tentar novamente
+      </button>
+    </div>
+  </main>
+);
+
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, accessStatus, navigateToLogin, isAdmin } = useAuth();
+  const {
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    isLoadingWorkspaces,
+    workspaceError,
+    authError,
+    isAuthenticated,
+    accessStatus,
+    navigateToLogin,
+    isAdmin,
+    accountType,
+    workspaceRole,
+  } = useAuth();
   const location = useLocation();
   const isPublicHome = location.pathname === '/';
 
@@ -74,8 +118,12 @@ const AuthenticatedApp = () => {
     return <PublicHome />;
   }
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingPublicSettings || isLoadingAuth || (isAuthenticated && isLoadingWorkspaces)) {
     return <AppLoadingScreen />;
+  }
+
+  if (isAuthenticated && workspaceError && location.pathname !== '/workspace-invite') {
+    return <WorkspaceErrorScreen error={workspaceError} />;
   }
 
   if (authError) {
@@ -89,16 +137,16 @@ const AuthenticatedApp = () => {
     }
   }
 
-  const publicPaths = ['/', '/login', '/teste-gratis', '/definir-senha', '/primeiro-acesso', '/termos-de-uso', '/politica-de-privacidade'];
+  const publicPaths = ['/', '/login', '/teste-gratis', '/definir-senha', '/primeiro-acesso', '/workspace-invite', '/termos-de-uso', '/politica-de-privacidade'];
   if (!isAuthenticated && !publicPaths.includes(location.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
-  if (isAuthenticated && (accessStatus === 'idle' || accessStatus === 'checking') && !['/teste-gratis', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
+  if (isAuthenticated && (accessStatus === 'idle' || accessStatus === 'checking') && !['/teste-gratis', '/workspace-invite', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
     return <AppAccessLoadingScreen />;
   }
 
-  if (isAuthenticated && accessStatus !== 'active' && !['/ativar-acesso', '/teste-gratis', '/definir-senha', '/primeiro-acesso', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
+  if (isAuthenticated && accessStatus !== 'active' && !['/ativar-acesso', '/teste-gratis', '/workspace-invite', '/definir-senha', '/primeiro-acesso', '/termos-de-uso', '/politica-de-privacidade'].includes(location.pathname)) {
     return <Navigate to="/ativar-acesso" replace />;
   }
 
@@ -110,14 +158,21 @@ const AuthenticatedApp = () => {
       <Route path="/teste-gratis" element={<Pages.FreeTrial />} />
       <Route path="/definir-senha" element={<Pages.SetPassword />} />
       <Route path="/primeiro-acesso" element={<Pages.FirstAccess />} />
+      <Route path="/workspace-invite" element={<WorkspaceInvite />} />
       <Route path="/ativar-acesso" element={<Pages.ActivateAccess />} />
       <Route path="/admin-licenses" element={
-        <LayoutWrapper currentPageName="AdminLicenses">
-          <Pages.AdminLicenses />
-        </LayoutWrapper>
+        isAdmin
+          ? <LayoutWrapper currentPageName="AdminLicenses"><Pages.AdminLicenses /></LayoutWrapper>
+          : <Navigate to={createPageUrl('Dashboard')} replace />
       } />
       <Route path="/" element={
-        !isAuthenticated ? <PublicHome /> : isAdmin ? <Navigate to="/admin-licenses" replace /> :
+        !isAuthenticated ? <PublicHome /> : isAdmin ? (
+          <LayoutWrapper currentPageName={mainPageKey}>
+            <MainPage />
+          </LayoutWrapper>
+        ) :
+        workspaceRole === 'finance' ? <Navigate to={createPageUrl('Finances')} replace /> :
+        workspaceRole === 'teacher' ? <Navigate to={createPageUrl('Schedule')} replace /> :
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />
         </LayoutWrapper>
@@ -127,9 +182,17 @@ const AuthenticatedApp = () => {
           key={path}
           path={createPageUrl(path)}
           element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
+            path === 'AdminLicenses' && !isAdmin
+              ? <Navigate to={createPageUrl('Dashboard')} replace />
+              : path === 'Workspace' && accountType !== 'studio' && !isAdmin
+              ? <Navigate to={createPageUrl('Dashboard')} replace />
+              : !isAdmin && pageRoles[path] && !pageRoles[path].includes(workspaceRole)
+              ? <Navigate to={createPageUrl(workspaceRole === 'finance' ? 'Finances' : workspaceRole === 'teacher' ? 'Schedule' : 'Dashboard')} replace />
+              : (
+                <LayoutWrapper currentPageName={path}>
+                  <Page />
+                </LayoutWrapper>
+              )
           }
         />
       ))}

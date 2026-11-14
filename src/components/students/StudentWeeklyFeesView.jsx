@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, CheckCircle2, ReceiptText, FileText } from 'lucide-react';
-
-const getLocalDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const startOfWeek = (date) => {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  result.setDate(result.getDate() - ((result.getDay() + 6) % 7));
-  return result;
-};
+import { buildWeeklyPaymentWeeks } from '@/utils/paymentUtils';
 
 const formatWeek = (date) => date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
@@ -26,16 +13,7 @@ export default function StudentWeeklyFeesView({ student, onBack, onPay, onGenera
   const [weeks, setWeeks] = useState([]);
 
   useEffect(() => {
-    const firstWeek = startOfWeek(student.created_date ? new Date(student.created_date) : new Date());
-    const currentWeek = startOfWeek(new Date());
-    const start = firstWeek < currentWeek ? firstWeek : currentWeek;
-    setWeeks(Array.from({ length: 12 }, (_, index) => {
-      const weekStart = new Date(start);
-      weekStart.setDate(start.getDate() + index * 7);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      return { weekStart: getLocalDate(weekStart), weekEnd: getLocalDate(weekEnd), weekStartDate: weekStart };
-    }));
+    setWeeks(buildWeeklyPaymentWeeks(student.created_date));
   }, [student.created_date]);
 
   const paymentHistory = Array.isArray(student.payment_history) ? student.payment_history : [];
@@ -63,8 +41,9 @@ export default function StudentWeeklyFeesView({ student, onBack, onPay, onGenera
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {weeks.map((week) => {
-          const payment = paymentHistory.find((entry) => entry.week_start === week.weekStart);
-          const isPaid = payment?.status === 'paid';
+          const isPaid = paymentHistory.some((entry) => (
+            entry?.period === 'week' && entry?.week_start === week.weekStart && entry?.status === 'paid'
+          ));
           return (
             <Card key={week.weekStart} className="p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">

@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Plus, Calendar as CalendarIcon, List, CalendarDays } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getLessonPaymentStatus } from "@/utils/paymentUtils";
+import { lessonService } from "@/modules/lessons/services/lessonService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
+import { studentService } from "@/modules/students/services/studentService";
+import { automationService } from "@/modules/automations/automationService";
+import { crmTrialService } from "@/modules/crm/services/crmService";
+import { useAuth } from "@/lib/AuthContext";
 
 import LessonForm from "../components/schedule/LessonForm";
 import CalendarView from "../components/schedule/CalendarView";
@@ -13,6 +18,7 @@ import ListView from "../components/schedule/ListView";
 import DayView from "../components/schedule/DayView";
 
 export default function Schedule() {
+  const { activeWorkspaceId, workspaceRole, userId } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -22,21 +28,50 @@ export default function Schedule() {
 
   const { data: lessons = [], isLoading } = useQuery({
     queryKey: ['lessons'],
-    queryFn: () => base44.entities.Lesson.list('-date'),
+    queryFn: () => lessonService.list('-date'),
   });
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
-    queryFn: () => base44.entities.Student.list(),
+    queryFn: () => studentService.list(),
   });
 
   const { data: appSettings } = useQuery({
     queryKey: ['appSettings'],
     queryFn: async () => {
-      const settings = await base44.entities.AppSettings.list();
+      const settings = await appSettingsService.list();
       return settings[0] || null;
     },
   });
+
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['workspaceTeachers', activeWorkspaceId],
+    queryFn: () => automationService.listAssignableMembers(),
+    enabled: Boolean(activeWorkspaceId),
+  });
+
+  const crmTrialEventsQuery = useQuery({
+    queryKey: ['crmScheduleTrials', activeWorkspaceId],
+    queryFn: () => crmTrialService.listForSchedule(),
+    enabled: Boolean(activeWorkspaceId),
+  });
+
+  const today = new Date();
+  const selectedLocalDate = [
+    selectedDate.getFullYear(),
+    String(selectedDate.getMonth() + 1).padStart(2, '0'),
+    String(selectedDate.getDate()).padStart(2, '0'),
+  ].join('-');
+  const todayLocalDate = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  const visibleTrialEvents = (crmTrialEventsQuery.data || []).filter((event) => (
+    view === 'list'
+      ? event.date >= todayLocalDate
+      : event.date === selectedLocalDate
+  ));
 
   const lessonsWithPaymentStatus = lessons.map((lesson) => {
     const student = students.find((item) => item.id === lesson.student_id);
@@ -49,10 +84,7 @@ export default function Schedule() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const lesson = await base44.entities.Lesson.create(data);
-      return lesson;
-    },
+    mutationFn: (data) => lessonService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['lessons']);
       setShowForm(false);
@@ -62,7 +94,7 @@ export default function Schedule() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Lesson.update(id, data),
+    mutationFn: ({ id, data }) => lessonService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['lessons']);
       setShowForm(false);
@@ -72,7 +104,7 @@ export default function Schedule() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Lesson.delete(id),
+    mutationFn: (id) => lessonService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['lessons']);
     },
@@ -156,6 +188,9 @@ export default function Schedule() {
           <LessonForm
             lesson={editingLesson}
             students={students}
+            teachers={teachers}
+            currentUserId={userId}
+            workspaceRole={workspaceRole}
             onSubmit={handleSubmit}
             onCancel={() => {
               setShowForm(false);
@@ -222,6 +257,38 @@ export default function Schedule() {
           />
         </TabsContent>
       </Tabs>
+
+      {crmTrialEventsQuery.error ? (
+        <section role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40">
+          <p className="font-semibold text-red-900 dark:text-red-100">Não foi possível carregar as aulas experimentais.</p>
+          <p className="mt-1 text-red-800 dark:text-red-200">{crmTrialEventsQuery.error.message}</p>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => crmTrialEventsQuery.refetch()}>
+            Tentar novamente
+          </Button>
+        </section>
+      ) : visibleTrialEvents.length > 0 && (
+        <section aria-label={view === 'list' ? 'Próximas aulas experimentais' : 'Aulas experimentais do dia'} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-3 flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-[#094C7E] dark:text-blue-300" />
+            <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+              {view === 'list' ? 'Próximas aulas experimentais' : `Aulas experimentais · ${selectedDate.toLocaleDateString('pt-BR')}`}
+            </h2>
+          </div>
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            {visibleTrialEvents.map((event) => (
+              <li key={event.id} className="flex items-center justify-between gap-4 py-3">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">{event.title}</p>
+                  {view === 'list' && <p className="text-sm text-slate-600 dark:text-slate-300">{new Date(`${event.date}T12:00:00`).toLocaleDateString('pt-BR')}</p>}
+                </div>
+                <span className="tabular-nums text-sm text-slate-600 dark:text-slate-300">
+                  {event.start_time?.slice(0, 5)}–{event.end_time?.slice(0, 5)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/api/supabaseClient';
-import { createPageUrl } from '@/utils';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +38,12 @@ export default function Login() {
   };
 
   const navigateAfterLogin = async (session) => {
+    const inviteToken = searchParams.get('invite');
+    if (inviteToken) {
+      navigate(`/workspace-invite?token=${encodeURIComponent(inviteToken)}`, { replace: true });
+      return;
+    }
+
     const { data: access, error: accessError } = await supabase.functions.invoke('activate-access', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -68,7 +73,7 @@ export default function Login() {
       return;
     }
 
-    navigate(access?.is_admin ? '/admin-licenses' : createPageUrl('Schedule'), { replace: true });
+    navigate('/', { replace: true });
   };
 
   // Lê mensagem de bloqueio da URL (ex: /login?blocked=...) e limpa o parâmetro

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,10 @@ import { Calendar, Clock, User, Send, Sparkles } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getPaymentStatus } from "@/utils/paymentUtils";
+import { lessonService } from "@/modules/lessons/services/lessonService";
+import { notificationService } from "@/modules/notifications/services/notificationService";
+import { appSettingsService } from "@/modules/settings/services/settingsService";
+import { studentService } from "@/modules/students/services/studentService";
 
 import ScheduleSuggestions from "../components/schedule/ScheduleSuggestions";
 import StudentSelector from "../components/schedule/StudentSelector";
@@ -20,46 +23,29 @@ export default function AutoSchedule() {
 
   const { data: students = [] } = useQuery({
     queryKey: ['students'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('student').select('*');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => studentService.list(),
   });
 
   const { data: lessons = [] } = useQuery({
     queryKey: ['lessons'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('lesson').select('*');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => lessonService.list(),
   });
 
   const { data: appSettings = [] } = useQuery({
     queryKey: ['appSettings'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('app_settings').select('*');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => appSettingsService.list(),
   });
 
   const settings = appSettings[0] || {};
 
   const createLessonMutation = useMutation({
     mutationFn: async (lessonData) => {
-      const { data: lesson, error } = await supabase
-        .from('lesson')
-        .insert(lessonData)
-        .select()
-        .single();
-      if (error) throw error;
+      const lesson = await lessonService.create(lessonData);
 
       // Send email notification to student
       if (selectedStudent.email) {
-        const { error: emailError } = await supabase.functions.invoke('send-email', {
-          body: {
+        try {
+          await notificationService.sendEmail({
             from_name: settings.professional_name || "Profissional",
             to: selectedStudent.email,
             subject: "Aula Agendada - Confirmação",
@@ -78,15 +64,16 @@ export default function AutoSchedule() {
 
               ${settings.professional_name || "Profissional"}
             `
-          }
-        });
-        if (emailError) console.error("Erro ao enviar email ao aluno:", emailError);
+          });
+        } catch (emailError) {
+          console.error("Erro ao enviar email ao aluno:", emailError);
+        }
       }
 
       // Send email notification to teacher
       if (settings.admin_email) {
-        const { error: adminEmailError } = await supabase.functions.invoke('send-email', {
-          body: {
+        try {
+          await notificationService.sendEmail({
             from_name: settings.professional_name || "Sistema",
             to: settings.admin_email,
             subject: "Nova Aula Agendada",
@@ -99,9 +86,10 @@ export default function AutoSchedule() {
               Horário: ${lessonData.start_time} - ${lessonData.end_time}
               ${lessonData.location ? `Local: ${lessonData.location}` : ''}
             `
-          }
-        });
-        if (adminEmailError) console.error("Erro ao enviar email ao admin:", adminEmailError);
+          });
+        } catch (adminEmailError) {
+          console.error("Erro ao enviar email ao admin:", adminEmailError);
+        }
       }
 
       return lesson;
@@ -124,6 +112,8 @@ export default function AutoSchedule() {
 
     const lessonData = {
       student_id: selectedStudent.id,
+      teacher_user_id: selectedStudent.teacher_user_id || null,
+      attendance_status: 'pending',
       student_name: selectedStudent.full_name,
       instrument: selectedStudent.instrument,
       date: format(selectedSlot.date, 'yyyy-MM-dd'),
@@ -131,7 +121,7 @@ export default function AutoSchedule() {
       end_time: selectedSlot.end_time,
       duration: settings.default_lesson_duration || 60,
       status: "scheduled",
-      payment_status: getPaymentStatus(selectedStudent.next_payment_date, selectedStudent.last_payment_date)
+      payment_status: getPaymentStatus(selectedStudent.next_payment_date, selectedStudent.payment_history)
     };
 
     createLessonMutation.mutate(lessonData);

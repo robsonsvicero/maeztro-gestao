@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { parseLocalDate } from "@/utils/dateUtils";
 import { formatPhone } from "@/utils/formatUtils";
+import { getLessonPaymentStatus, getPaymentStatus } from "@/utils/paymentUtils";
 
 export default function StudentCard({
   student,
@@ -10,10 +11,14 @@ export default function StudentCard({
   onDelete,
   onOpenMonthlyFees,
   onReschedule,
+  showFinancialInfo = true,
 }) {
   if (!student) return null;
 
   const isInactive = student.student_status === 'inactive';
+  const paymentStatus = student.payment_type === 'weekly'
+    ? getLessonPaymentStatus(student, { date: new Date() })
+    : getPaymentStatus(student.next_payment_date, student.payment_history);
 
   const initials = (student.full_name || "Aluno")
     .split(" ")
@@ -62,7 +67,7 @@ export default function StudentCard({
       </div>
 
       <div className="flex-1 space-y-3 p-4 text-sm text-slate-700 dark:text-slate-200">
-        {(student.monthly_payment || student.weekly_payment) && (
+        {showFinancialInfo && (student.monthly_payment || student.weekly_payment) && (
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#094C7E] dark:text-sky-300">
               {student.payment_type === 'weekly' ? 'Por aula:' : 'Mensalidade:'}
@@ -71,10 +76,10 @@ export default function StudentCard({
           </div>
         )}
 
-        {(student.payment_status || student.next_payment_date) && (
+        {showFinancialInfo && (student.payment_status || student.next_payment_date || student.payment_type === 'weekly') && (
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#094C7E] dark:text-sky-300">Pagamento:</span>
-            {student.payment_status === 'paid' ? (
+            {paymentStatus === 'paid' ? (
               <>
                 <span className="text-green-600 font-medium">Pago</span>
                 {student.last_payment_date && (
@@ -82,7 +87,9 @@ export default function StudentCard({
                 )}
               </>
             ) : (
-              <span className="font-bold text-red-600 uppercase">PENDENTE</span>
+              <span className={`font-bold uppercase ${paymentStatus === 'overdue' ? 'text-red-600' : 'text-slate-500'}`}>
+                {paymentStatus === 'overdue' ? 'Em atraso' : paymentStatus === 'canceled' ? 'Cancelado' : 'Pendente'}
+              </span>
             )}
           </div>
         )}
@@ -139,10 +146,12 @@ export default function StudentCard({
           </Button>
         ) : (
           <>
-            <Button variant="outline" size="sm" onClick={onOpenMonthlyFees} className="col-span-2 w-full min-w-0 border-slate-300 bg-white px-2 text-slate-700 hover:bg-slate-100 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
-              <CheckCircle className="mr-1.5 h-4 w-4 shrink-0" />
-              {student.payment_type === 'weekly' ? 'Pagamentos semanais' : 'Mensalidades'}
-            </Button>
+            {showFinancialInfo && (
+              <Button variant="outline" size="sm" onClick={onOpenMonthlyFees} className="col-span-2 w-full min-w-0 border-slate-300 bg-white px-2 text-slate-700 hover:bg-slate-100 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">
+                <CheckCircle className="mr-1.5 h-4 w-4 shrink-0" />
+                {student.payment_type === 'weekly' ? 'Pagamentos semanais' : 'Mensalidades'}
+              </Button>
+            )}
 
             {onReschedule && (
               <Button variant="outline" size="sm" onClick={onReschedule} className="col-span-2 w-full min-w-0 border-[#094C7E]/40 bg-white px-2 text-[#094C7E] hover:bg-[#094C7E]/5 dark:border-blue-400/40 dark:bg-slate-700 dark:text-blue-200 dark:hover:bg-slate-600">

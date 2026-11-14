@@ -37,6 +37,28 @@ Não envie o arquivo `.env.local` ao repositório e **nunca adicione `SUPABASE_S
 Depois de publicar o domínio, adicione-o no Supabase em **Authentication → URL Configuration**:
 
 - **Site URL**: `https://app-maeztro.gestfors.com.br`;
-- **Redirect URLs**: `https://app-maeztro.gestfors.com.br/Settings` e `https://app-maeztro.gestfors.com.br/login`.
+- **Redirect URLs**: `https://app-maeztro.gestfors.com.br/Settings`, `https://app-maeztro.gestfors.com.br/login` e `https://app-maeztro.gestfors.com.br/workspace-invite`.
 
 Para recuperação de senha, confirme que o provedor SMTP está configurado no Supabase.
+
+## Workspaces e equipe
+
+As migrations `supabase/workspaces.sql` e `supabase/automations.sql` ainda precisam ser revisadas e aplicadas no Supabase. Não publique o frontend nem as Edge Functions destas fases antes delas.
+
+Ordem de implantação:
+
+1. Confirme que `supabase/user_data_rls.sql` e o schema de entitlements (`supabase/google_play_billing_schema.sql`) já foram aplicados. Não reaplique migrations existentes sem revisar o estado atual do banco.
+2. Faça backup e valide `supabase/workspaces.sql` primeiro em um ambiente de teste; ela cria o workspace padrão, atribui os registros existentes e substitui políticas RLS. Tabelas opcionais ausentes são ignoradas, não criadas; se precisar do recurso correspondente (por exemplo, Orçamento), aplique também o schema dessa tabela.
+3. Configure `workspace_plan_limits` com os IDs reais de produtos e limites aprovados antes de enviar convites. O limite de membros considera usuários únicos em todos os workspaces do proprietário, incluindo convites pendentes. Produtos sem mapeamento ficam, intencionalmente, no limite seguro de um workspace e um membro (somente o proprietário).
+4. Após `workspaces.sql`, aplique `supabase/automations.sql`. Ela cria o motor, as regras e o histórico; acrescenta professor responsável e presença às aulas e permite configurar a disponibilidade semanal.
+5. Execute novamente `supabase/maintain_future_lessons.sql` para que a rotina agendada inclua o workspace, o professor e a presença pendente nas aulas criadas.
+6. Revise e aplique `supabase/crm.sql`. Ela exige as colunas da tabela `public.student` usadas pela conversão e interrompe a execução se encontrar uma incompatibilidade.
+7. Revise e aplique `supabase/intelligence.sql` para adicionar a data prevista de encerramento ao cadastro de alunos.
+8. Publique as Edge Functions atualizadas (`activate-access`, `sync-recurrence` e `run-automations`) e, por último, o frontend.
+9. Configure o secret `AUTOMATION_CRON_SECRET` no Supabase e crie um agendamento horário para `run-automations`, enviando `Authorization: Bearer <AUTOMATION_CRON_SECRET>`. O worker rejeita chamadas sem esse token. Não use uma chave de usuário no agendamento.
+
+As automações desta fase geram somente avisos internos no painel; não enviam e-mail, WhatsApp ou mensagens aos alunos. O horário semanal padrão é segunda-feira às 8h de São Paulo. Regras sem dados necessários (por exemplo, ocupação sem horários cadastrados) ficam bloqueadas com o motivo registrado no histórico.
+
+O CRM é privado ao proprietário. A migration `supabase/crm.sql` adiciona o funil de interessados, contatos, aulas experimentais, conversão com conferência de telefone e lembretes internos de follow-up. Professores designados veem na agenda apenas o horário e o rótulo “Aula experimental”.
+
+Professores podem administrar alunos e aulas; o papel Financeiro tem leitura de finanças. A assinatura do proprietário autoriza membros ativos do workspace. Convites expiram em sete dias e só são aceitos por uma conta com o mesmo endereço de e-mail.

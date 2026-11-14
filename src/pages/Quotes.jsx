@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import QuoteForm from "../components/quotes/QuoteForm";
 import QuoteList from "../components/quotes/QuoteList";
 import QuotePreview from "../components/quotes/QuotePreview";
+import { clientService, quoteService } from "@/modules/crm/services/crmService";
+import { serviceOrderService } from "@/modules/service-orders/services/serviceOrderService";
+import { companySettingsService } from "@/modules/settings/services/settingsService";
 
 export default function Quotes() {
   const [showForm, setShowForm] = useState(false);
@@ -21,21 +23,21 @@ export default function Quotes() {
 
   const { data: quotes = [], isLoading } = useQuery({
     queryKey: ['quotes'],
-    queryFn: () => base44.entities.Quote.list('-created_date'),
+    queryFn: () => quoteService.list('-created_date'),
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list(),
+    queryFn: () => clientService.list(),
   });
 
   const { data: companySettings = [] } = useQuery({
     queryKey: ['companySettings'],
-    queryFn: () => base44.entities.CompanySettings.list(),
+    queryFn: () => companySettingsService.list(),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Quote.create(data),
+    mutationFn: (data) => quoteService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['quotes']);
       setShowForm(false);
@@ -44,7 +46,7 @@ export default function Quotes() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Quote.update(id, data),
+    mutationFn: ({ id, data }) => quoteService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['quotes']);
       setShowForm(false);
@@ -54,7 +56,7 @@ export default function Quotes() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Quote.delete(id),
+    mutationFn: (id) => quoteService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['quotes']);
     },
@@ -63,7 +65,7 @@ export default function Quotes() {
   const createServiceOrderMutation = useMutation({
     mutationFn: async (quote) => {
       const orderNumber = `OS-${Date.now()}`;
-      await base44.entities.ServiceOrder.create({
+      await serviceOrderService.create({
         order_number: orderNumber,
         quote_id: quote.id,
         client_id: quote.client_id,
@@ -77,7 +79,7 @@ export default function Quotes() {
         notes: `Gerado a partir do orçamento ${quote.quote_number}`
       });
       
-      await base44.entities.Quote.update(quote.id, { status: "approved" });
+      await quoteService.update(quote.id, { status: "approved" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['quotes']);

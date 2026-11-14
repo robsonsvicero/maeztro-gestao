@@ -7,8 +7,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getNextPaymentDate, getPaymentStatus } from "@/utils/paymentUtils";
 import { formatPhone, unformatPhone } from "@/utils/formatUtils";
 
-export default function StudentForm({ student, onSubmit, onCancel, theme, isSubmitting = false }) {
-  const [formData, setFormData] = useState(student || {
+export default function StudentForm({
+  student,
+  onSubmit,
+  onCancel,
+  theme,
+  isSubmitting = false,
+  canEditFinancialFields = true,
+  teachers = [],
+  currentUserId,
+  workspaceRole,
+}) {
+  const [formData, setFormData] = useState(student ? {
+    ...student,
+    teacher_user_id: student.teacher_user_id || (workspaceRole === 'teacher' ? currentUserId : null),
+  } : {
     full_name: "",
     birthday_day: "",
     birthday_month: "",
@@ -28,8 +41,10 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
     payment_status: "pending",
     student_status: "active",
     student_state: "active",
+    teacher_user_id: workspaceRole === 'teacher' ? currentUserId : null,
     last_payment_date: "",
     next_payment_date: "",
+    expected_end_date: "",
     notes: ""
   });
 
@@ -49,7 +64,7 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
     // Calculate automatic payment status
     const autoStatus = getPaymentStatus(
       nextDate,
-      formData.last_payment_date,
+      formData.payment_history,
     );
 
     setCalculatedPaymentStatus(autoStatus);
@@ -61,7 +76,7 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
 
       return { ...current, next_payment_date: nextDate };
     });
-  }, [formData.payment_day, formData.payment_status, formData.payment_history, formData.last_payment_date]);
+  }, [formData.payment_type, formData.payment_day, formData.payment_status, formData.payment_history]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -71,18 +86,45 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
       Array.isArray(formData.payment_history) ? formData.payment_history : [],
     );
 
-    onSubmit({
+    const submittedStudent = {
       ...formData,
       payment_type: formData.payment_type || 'monthly',
       payment_status: calculatedPaymentStatus || 'pending',
       next_payment_date: nextPaymentDate || null,
       last_payment_date: formData.last_payment_date || null,
+      expected_end_date: formData.expected_end_date || null,
       birthday_day: formData.birthday_day ? parseInt(formData.birthday_day) : undefined,
       birthday_month: formData.birthday_month ? parseInt(formData.birthday_month) : undefined,
       monthly_payment: formData.payment_type === 'weekly' ? 0 : (formData.monthly_payment ? Number(formData.monthly_payment) : 0),
       weekly_payment: formData.payment_type === 'weekly' ? (formData.weekly_payment ? Number(formData.weekly_payment) : 0) : 0,
       payment_day: formData.payment_type === 'weekly' ? undefined : (formData.payment_day ? Number(formData.payment_day) : undefined),
-    });
+    };
+
+    if (!canEditFinancialFields) {
+      const financialFields = [
+        'payment_type',
+        'monthly_payment',
+        'weekly_payment',
+        'payment_day',
+        'payment_status',
+        'last_payment_date',
+        'next_payment_date',
+        'payment_history',
+      ];
+      financialFields.forEach((field) => {
+        if (student) {
+          submittedStudent[field] = student[field];
+        } else {
+          submittedStudent[field] = field === 'payment_type' ? 'monthly'
+            : field === 'payment_status' ? 'pending'
+              : field === 'payment_history' ? []
+                : field.endsWith('_payment') ? 0
+                  : null;
+        }
+      });
+    }
+
+    onSubmit(submittedStudent);
   };
 
   const labelClass = theme === 'dark' ? 'text-slate-200' : '';
@@ -211,6 +253,29 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="teacher_user_id" className={labelClass}>Professor responsável</Label>
+          <Select
+            value={formData.teacher_user_id || 'unassigned'}
+            onValueChange={(value) => setFormData({
+              ...formData,
+              teacher_user_id: value === 'unassigned' ? null : value,
+            })}
+          >
+            <SelectTrigger id="teacher_user_id" className={inputClass}>
+              <SelectValue placeholder="Selecione um professor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Sem professor definido</SelectItem>
+              {teachers.map((teacher) => (
+                <SelectItem key={teacher.user_id} value={teacher.user_id}>
+                  {teacher.full_name}{teacher.role_key === 'owner' ? ' (proprietário)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="birthday_day" className={labelClass}>Dia de Nascimento</Label>
           <Input
             id="birthday_day"
@@ -238,7 +303,7 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
           />
         </div>
 
-        <div className="space-y-2">
+        {canEditFinancialFields && <div className="space-y-2">
           <Label htmlFor="payment_type" className={labelClass}>Forma de cobrança</Label>
           <Select
             value={formData.payment_type || 'monthly'}
@@ -252,9 +317,9 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
               <SelectItem value="weekly">Por aula / semanal</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </div>}
 
-        <div className="space-y-2">
+        {canEditFinancialFields && <div className="space-y-2">
           <Label htmlFor={formData.payment_type === 'weekly' ? 'weekly_payment' : 'monthly_payment'} className={labelClass}>
             {formData.payment_type === 'weekly' ? 'Valor por aula (R$)' : 'Mensalidade (R$)'}
           </Label>
@@ -271,9 +336,9 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
             placeholder="0,00"
             className={inputClass}
           />
-        </div>
+        </div>}
 
-        {formData.payment_type !== 'weekly' && <div className="space-y-2">
+        {canEditFinancialFields && formData.payment_type !== 'weekly' && <div className="space-y-2">
           <Label htmlFor="payment_day" className={labelClass}>Dia de vencimento</Label>
           <Input
             id="payment_day"
@@ -287,17 +352,22 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
           />
         </div>}
 
-        <div className="space-y-2">
+        {canEditFinancialFields && <div className="space-y-2">
           <Label htmlFor="payment_status" className={labelClass}>Status do pagamento</Label>
           <Input
             id="payment_status"
             type="text"
-            value={calculatedPaymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+            value={{
+              paid: 'Pago',
+              pending: 'Pendente',
+              overdue: 'Em atraso',
+              canceled: 'Cancelado',
+            }[calculatedPaymentStatus] || 'Pendente'}
             disabled
             readOnly
             className={`${inputClass} bg-slate-100 text-slate-600 cursor-not-allowed dark:bg-slate-800 dark:text-slate-300`}
           />
-        </div>
+        </div>}
 
         <div className="space-y-2">
           <Label htmlFor="student_status" className={labelClass}>Status do aluno</Label>
@@ -316,6 +386,17 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="expected_end_date" className={labelClass}>Previsão de encerramento</Label>
+          <Input
+            id="expected_end_date"
+            type="date"
+            value={formData.expected_end_date || ''}
+            onChange={(e) => setFormData({ ...formData, expected_end_date: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        {canEditFinancialFields && <div className="space-y-2">
           <Label htmlFor="last_payment_date" className={labelClass}>Último pagamento</Label>
           <Input
             id="last_payment_date"
@@ -324,9 +405,9 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
             onChange={(e) => setFormData({ ...formData, last_payment_date: e.target.value })}
             className={inputClass}
           />
-        </div>
+        </div>}
 
-        <div className="space-y-2">
+        {canEditFinancialFields && <div className="space-y-2">
           <Label htmlFor="next_payment_date" className={labelClass}>Próximo vencimento</Label>
           <Input
             id="next_payment_date"
@@ -335,7 +416,7 @@ export default function StudentForm({ student, onSubmit, onCancel, theme, isSubm
             readOnly
             className={`${inputClass} bg-slate-100 text-slate-600 cursor-not-allowed dark:bg-slate-800 dark:text-slate-300`}
           />
-        </div>
+        </div>}
 
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="address" className={labelClass}>Endereço</Label>
