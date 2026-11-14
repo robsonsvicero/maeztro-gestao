@@ -55,7 +55,7 @@ Ordem de implantação:
 6. Revise e aplique `supabase/crm.sql`. Ela exige as colunas da tabela `public.student` usadas pela conversão e interrompe a execução se encontrar uma incompatibilidade.
 7. Revise e aplique `supabase/intelligence.sql` para adicionar a data prevista de encerramento ao cadastro de alunos.
 8. Publique as Edge Functions atualizadas (`activate-access`, `sync-recurrence` e `run-automations`) e, por último, o frontend.
-9. Configure o secret `AUTOMATION_CRON_SECRET` no Supabase e crie um agendamento horário para `run-automations`, enviando `Authorization: Bearer <AUTOMATION_CRON_SECRET>`. O worker rejeita chamadas sem esse token. Não use uma chave de usuário no agendamento.
+9. Habilite `pg_net` (`create extension if not exists pg_net with schema extensions;`), configure `AUTOMATION_CRON_SECRET` nas secrets da Edge Function e armazene a URL do projeto e o mesmo token no Supabase Vault (`project_url` e `automation_cron_secret`). Crie um cron horário que invoque `run-automations` com `Authorization: Bearer <AUTOMATION_CRON_SECRET>` e `timeout_milliseconds := 30000`; o worker rejeita chamadas sem esse token. Não use uma chave de usuário no agendamento.
 
 As automações desta fase geram somente avisos internos no painel; não enviam e-mail, WhatsApp ou mensagens aos alunos. O horário semanal padrão é segunda-feira às 8h de São Paulo. Regras sem dados necessários (por exemplo, ocupação sem horários cadastrados) ficam bloqueadas com o motivo registrado no histórico.
 
