@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
+import { isStudioMember } from "@/modules/shared/accessControl";
 import { profileService } from "@/modules/auth/services/profileService";
 import { appSettingsService } from "@/modules/settings/services/settingsService";
 import { storageService } from "@/modules/shared/services/storageService";
@@ -38,7 +39,17 @@ const KIWIFY_CHECKOUTS = {
 const isAndroidApp = Capacitor.getPlatform() === 'android';
 export default function Settings() {
   const queryClient = useQueryClient();
-  const { accessType, accessProvider, accessStatus, accessEndsAt } = useAuth();
+  const {
+    accessType,
+    accessProvider,
+    accessStatus,
+    accessEndsAt,
+    activeWorkspaceId,
+    accountType,
+    isAdmin,
+    workspaceRole,
+  } = useAuth();
+  const isMemberSettings = isStudioMember(workspaceRole, accountType, isAdmin);
   const [uploading, setUploading] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [billingAvailable, setBillingAvailable] = useState(false);
@@ -103,6 +114,7 @@ export default function Settings() {
     let mounted = true;
     const loadSubscriptionPlans = async () => {
       try {
+        if (isMemberSettings) return;
         if (!(await isGooglePlayBillingAvailable())) return;
         const plans = await getSubscriptionPlans();
         if (mounted) {
@@ -115,7 +127,7 @@ export default function Settings() {
     };
     loadSubscriptionPlans();
     return () => { mounted = false; };
-  }, []);
+  }, [isMemberSettings]);
 
   const buySubscriptionPlan = async (plan) => {
     setPurchasingPlan(plan.identifier);
@@ -197,6 +209,21 @@ export default function Settings() {
       const existingRows = await appSettingsService.list();
 
       const targetRow = settings[0] ?? existingRows[0];
+
+      if (isMemberSettings) {
+        if (!activeWorkspaceId) throw new Error('Nenhum estúdio ativo foi selecionado.');
+        const { data: savedSettings, error } = await supabase.rpc('update_studio_member_settings', {
+          target_workspace_id: activeWorkspaceId,
+          new_professional_name: data.professional_name,
+          new_teacher_phone: data.teacher_phone,
+          new_logo_url: data.logo_url,
+          new_default_lesson_duration: data.default_lesson_duration,
+          new_available_hours: data.available_hours,
+        });
+        if (error) throw error;
+        if (!savedSettings) throw new Error('O servidor não confirmou a atualização das configurações.');
+        return savedSettings;
+      }
 
       if (targetRow?.id) {
         return appSettingsService.update(targetRow.id, data);
@@ -343,7 +370,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {!isMemberSettings && <div className="space-y-2">
               <Label htmlFor="cpf_cnpj">
                 CPF ou CNPJ
               </Label>
@@ -353,7 +380,7 @@ export default function Settings() {
                 onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value })}
                 placeholder="Digite o CPF ou CNPJ"
               />
-            </div>
+            </div>}
 
             <div className="space-y-2">
               <Label>Logo ou foto do profissional</Label>
@@ -405,6 +432,8 @@ export default function Settings() {
               <Input
                 id="default_lesson_duration"
                 type="number"
+                min="1"
+                max="480"
                 value={formData.default_lesson_duration}
                 onChange={(e) => setFormData({ ...formData, default_lesson_duration: parseInt(e.target.value) })}
               />
@@ -440,7 +469,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xl">
+        {!isMemberSettings && <Card className="shadow-xl">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-[#094C7E]" />
@@ -506,7 +535,7 @@ export default function Settings() {
             </div>
             {billingMessage && <p className="text-sm text-amber-700 dark:text-amber-300">{billingMessage}</p>}
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card className="shadow-xl">
           <CardHeader className="border-b">

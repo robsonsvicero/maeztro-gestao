@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, CheckCircle2, ReceiptText, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ReceiptText, FileText, Trash2 } from 'lucide-react';
 import { buildWeeklyPaymentWeeks } from '@/utils/paymentUtils';
 
 const formatWeek = (date) => date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
-export default function StudentWeeklyFeesView({ student, onBack, onPay, onGenerateReceipt }) {
+export default function StudentWeeklyFeesView({ student, onBack, onPay, onDeletePayment, onGenerateReceipt }) {
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [generateReceiptAfterPay, setGenerateReceiptAfterPay] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('pix');
@@ -51,7 +51,23 @@ export default function StudentWeeklyFeesView({ student, onBack, onPay, onGenera
                 {isPaid ? <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-semibold uppercase text-green-700">Pago</span> : <span className="rounded-full bg-orange-100 px-2 py-1 text-[10px] font-semibold uppercase text-orange-700">Aberto</span>}
               </div>
               {isPaid ? (
-                <Button className="w-full bg-gradient-to-r from-[#094C7E] to-[#0A5A94]" onClick={() => onGenerateReceipt(week)}><FileText className="mr-2 h-4 w-4" />Gerar recibo</Button>
+                <div className="flex flex-col gap-2">
+                  <Button className="w-full bg-gradient-to-r from-[#094C7E] to-[#0A5A94]" onClick={() => onGenerateReceipt(week)}><FileText className="mr-2 h-4 w-4" />Gerar recibo</Button>
+                  {onDeletePayment && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+                      onClick={() => {
+                        if (window.confirm(`Deseja excluir o pagamento da semana de ${formatWeek(week.weekStartDate)}? A semana voltará para aberto.`)) {
+                          onDeletePayment(week);
+                        }
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir pagamento
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <Button className="w-full bg-gradient-to-r from-[#094C7E] to-[#0A5A94]" onClick={() => openPaymentModal(week)}><CheckCircle2 className="mr-2 h-4 w-4" />Registrar pagamento</Button>
               )}

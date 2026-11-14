@@ -8,6 +8,7 @@ import {
   getNextPaymentDate,
   getPaymentStatus,
   getWeeklyPaymentAmount,
+  removeWeeklyPaymentEntry,
 } from '../src/utils/paymentUtils.js';
 
 const referenceDate = new Date('2026-09-14T12:00:00');
@@ -82,4 +83,17 @@ test('weekly receipt amount comes from the paid history, not the current per-les
   };
 
   assert.equal(getWeeklyPaymentAmount(student, '2026-09-14'), 85);
+});
+
+test('removing a weekly payment preserves other weeks and monthly history', () => {
+  const paymentHistory = [
+    { period: 'week', week_start: '2026-09-07', status: 'paid' },
+    { period: 'week', week_start: '2026-09-14', status: 'paid' },
+    { month: '9', year: '2026', status: 'paid' },
+  ];
+
+  assert.deepEqual(removeWeeklyPaymentEntry(paymentHistory, '2026-09-14'), [
+    { period: 'week', week_start: '2026-09-07', status: 'paid' },
+    { month: '9', year: '2026', status: 'paid' },
+  ]);
 });

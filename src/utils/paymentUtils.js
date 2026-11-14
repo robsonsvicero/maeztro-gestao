@@ -112,6 +112,12 @@ export const getWeeklyPaymentAmount = (student, weekStart) => {
   return getPaymentAmount(paymentEntry, student?.weekly_payment);
 };
 
+export const removeWeeklyPaymentEntry = (paymentHistory, weekStart) => (
+  (Array.isArray(paymentHistory) ? paymentHistory : []).filter((entry) => (
+    !(entry?.period === 'week' && entry?.week_start === weekStart)
+  ))
+);
+
 export const getLessonPaymentStatus = (student, lesson, referenceDate = new Date()) => {
   if (!student) return 'pending';
 

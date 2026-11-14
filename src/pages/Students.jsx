@@ -10,6 +10,7 @@ import {
   getMonthlyPaymentAmount,
   getNextPaymentDate,
   getPaymentStatus,
+  removeWeeklyPaymentEntry,
   getWeeklyPaymentAmount,
 } from "@/utils/paymentUtils";
 import { generateAutomaticLessons, deleteFutureLessons, getLessonDayOfWeek, rescheduleFutureLessons } from "@/utils/lessonUtils";
@@ -442,6 +443,38 @@ export default function Students() {
     toast.success('Pagamento removido. Mensalidade voltou para aberto.');
   };
 
+  const handleDeleteWeeklyPayment = async (student, week) => {
+    try {
+      const paymentHistory = Array.isArray(student.payment_history) ? student.payment_history : [];
+      const filteredHistory = removeWeeklyPaymentEntry(paymentHistory, week.weekStart);
+      if (filteredHistory.length === paymentHistory.length) return;
+
+      await syncWeeklyLessonsPaymentStatus(student, week, 'pending');
+
+      const lastPaymentDate = filteredHistory.reduce((latest, entry) => (
+        entry?.status === 'paid' && entry?.paid_at > latest ? entry.paid_at : latest
+      ), '');
+      const hasPaidPayments = filteredHistory.some((entry) => entry?.status === 'paid');
+      const updatedStudent = await studentService.update(student.id, {
+        ...student,
+        payment_history: filteredHistory,
+        payment_status: hasPaidPayments ? 'paid' : 'pending',
+        last_payment_date: lastPaymentDate || null,
+      });
+
+      if (!updatedStudent) {
+        throw new Error('Não foi possível atualizar o histórico de pagamentos do aluno.');
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      setSelectedStudentForFees(updatedStudent);
+      toast.success('Pagamento removido. A semana voltou para aberto.');
+    } catch (error) {
+      console.error('Erro ao excluir pagamento semanal:', error);
+      toast.error(error?.message || 'Não foi possível excluir o pagamento semanal.');
+    }
+  };
+
   const handleGenerateReceipt = async (student, monthNumber, paymentMethod = 'pix') => {
     const receipt = await createReceiptForStudent(student, monthNumber, getLocalDateString(), paymentMethod);
     queryClient.invalidateQueries(['receipts']);
@@ -491,6 +524,7 @@ export default function Students() {
             student={selectedStudentForFees}
             onBack={() => { setSelectedStudentForFees(null); setPreviewReceipt(null); }}
             onPay={(week, paymentInfo) => handleRegisterWeeklyPayment(selectedStudentForFees, week, paymentInfo)}
+            onDeletePayment={(week) => handleDeleteWeeklyPayment(selectedStudentForFees, week)}
             onGenerateReceipt={(week) => handleGenerateWeeklyReceipt(selectedStudentForFees, week)}
           />
         ) : (

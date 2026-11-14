@@ -16,26 +16,11 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfUse from '@/pages/TermsOfUse';
 import WorkspaceInvite from '@/pages/WorkspaceInvite';
 import { ThemeProvider } from '@/lib/ThemeContext';
+import { canAccessPage } from '@/modules/shared/accessControl';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
-const pageRoles = {
-  Dashboard: ['owner'],
-  Finances: ['owner', 'finance'],
-  Clients: ['owner'],
-  Receipts: ['owner'],
-  Students: ['owner', 'teacher'],
-  Settings: ['owner'],
-  Schedule: ['owner', 'teacher'],
-  AutoSchedule: ['owner', 'teacher'],
-  Automations: ['owner', 'teacher'],
-  CRM: ['owner'],
-  Budget: ['owner'],
-  Outros: ['owner'],
-  Workspace: ['owner', 'teacher', 'finance'],
-};
-
 const AppLoadingScreen = () => (
   <div className="min-h-screen bg-slate-50 p-4 dark:bg-slate-900 md:p-6">
     <div className="mx-auto flex max-w-7xl gap-6">
@@ -187,7 +172,7 @@ const AuthenticatedApp = () => {
               ? <Navigate to={createPageUrl('Dashboard')} replace />
               : path === 'Workspace' && accountType !== 'studio' && !isAdmin
               ? <Navigate to={createPageUrl('Dashboard')} replace />
-              : !isAdmin && pageRoles[path] && !pageRoles[path].includes(workspaceRole)
+              : !canAccessPage(path, workspaceRole, isAdmin)
               ? <Navigate to={createPageUrl(workspaceRole === 'finance' ? 'Finances' : workspaceRole === 'teacher' ? 'Schedule' : 'Dashboard')} replace />
               : (
                 <LayoutWrapper currentPageName={path}>

@@ -85,6 +85,13 @@ de Licenças. A alteração atualiza os workspaces pertencentes ao usuário, sem
 mover ou apagar dados. Os valores comerciais e o produto de cobrança ainda
 precisam ser configurados no provedor de pagamentos antes de cobrar os planos.
 
+## Configurações de membros do Estúdio
+
+Execute `studio_member_settings.sql` depois de `workspaces.sql` e
+`account_types.sql`. A função permite a professores e membros financeiros ativos
+alterar apenas nome profissional, telefone, logo/foto, duração padrão e horários
+disponíveis. O acesso às Automações continua exclusivo do proprietário.
+
 O CRM é privado ao proprietário. Professores designados veem na agenda somente
 o horário e o rótulo “Aula experimental”. Após aplicar a migration, publique a
 Edge Function `run-automations` atualizada para habilitar lembretes de retorno.

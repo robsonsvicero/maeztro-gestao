@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ThemeSwitch } from "@/components/ui/theme-switch";
+import { canManageSettings } from "@/modules/shared/accessControl";
 import { useAuth } from "@/lib/AuthContext";
 import LessonReminder from "@/components/schedule/LessonReminder";
 import LegalConsentGate from "@/components/legal/LegalConsentGate";
@@ -52,7 +53,7 @@ const navigationItems = [
   { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard, roles: ['owner'] },
   { title: "Agenda", url: createPageUrl("Schedule"), icon: Calendar, roles: ['owner', 'teacher'] },
   { title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles, roles: ['owner', 'teacher'] },
-  { title: "Automações", url: createPageUrl("Automations"), icon: Workflow, roles: ['owner', 'teacher'] },
+  { title: "Automações", url: createPageUrl("Automations"), icon: Workflow, roles: ['owner'] },
   { title: "CRM", url: createPageUrl("CRM"), icon: ContactRound, roles: ['owner'] },
   { title: "Finanças", url: createPageUrl("Finances"), icon: Wallet, roles: ['owner', 'finance'] },
   { title: "Alunos", url: createPageUrl("Students"), icon: Users, roles: ['owner', 'teacher'] },
@@ -183,7 +184,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
     ...(navigationRole === 'owner' || navigationRole === 'teacher'
       ? [{ title: "Agendamento Auto", url: createPageUrl("AutoSchedule"), icon: Sparkles }]
       : []),
-    ...(navigationRole === 'owner' || navigationRole === 'teacher'
+    ...(navigationRole === 'owner'
       ? [{ title: "Automações", url: createPageUrl("Automations"), icon: Workflow }]
       : []),
     ...(navigationRole === 'owner'
@@ -192,7 +193,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
     ...((accountType === 'studio' || isAdmin)
       ? [{ title: "Estúdio", url: createPageUrl("Workspace"), icon: Building2 }]
       : []),
-    ...(navigationRole === 'owner'
+    ...(canManageSettings(workspaceRole, accountType, isAdmin)
       ? [{ title: "Configurações", url: createPageUrl("Settings"), icon: Settings }]
       : []),
     ...(isAdmin ? [{ title: "Licenças", url: createPageUrl("AdminLicenses"), icon: KeyRound }] : [])
@@ -262,7 +263,7 @@ export default function Layout({ children, currentPageName: _currentPageName }) 
                       </SidebarMenuItem>
                     );
                   })}
-                  {navigationRole === 'owner' && <SidebarMenuItem className="w-full">
+                  {canManageSettings(workspaceRole, accountType, isAdmin) && <SidebarMenuItem className="w-full">
                     <SidebarMenuButton 
                       asChild 
                       className={`rounded-xl transition-all duration-200 mb-1 ${
