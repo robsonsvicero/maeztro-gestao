@@ -82,6 +82,34 @@ export const buildWeeklyPaymentWeeks = (createdDate, referenceDate = new Date(),
   });
 };
 
+const getPaymentAmount = (entry, fallbackAmount) => {
+  if (entry?.amount !== null && entry?.amount !== undefined && entry.amount !== '') {
+    const amount = Number(entry.amount);
+    if (Number.isFinite(amount)) return amount;
+  }
+  return Number(fallbackAmount || 0);
+};
+
+export const getMonthlyPaymentAmount = (student, month, year = new Date().getFullYear()) => {
+  const paymentHistory = Array.isArray(student?.payment_history) ? student.payment_history : [];
+  const paymentEntry = paymentHistory.find((entry) => (
+    Number(entry?.month) === Number(month)
+    && Number(entry?.year) === Number(year)
+    && entry?.status === 'paid'
+  ));
+  return getPaymentAmount(paymentEntry, student?.monthly_payment);
+};
+
+export const getWeeklyPaymentAmount = (student, weekStart) => {
+  const paymentHistory = Array.isArray(student?.payment_history) ? student.payment_history : [];
+  const paymentEntry = paymentHistory.find((entry) => (
+    entry?.period === 'week'
+    && entry?.week_start === weekStart
+    && entry?.status === 'paid'
+  ));
+  return getPaymentAmount(paymentEntry, student?.weekly_payment);
+};
+
 export const getLessonPaymentStatus = (student, lesson, referenceDate = new Date()) => {
   if (!student) return 'pending';
 

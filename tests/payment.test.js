@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
   buildWeeklyPaymentWeeks,
+  getMonthlyPaymentAmount,
   getLessonPaymentStatus,
   getNextPaymentDate,
   getPaymentStatus,
+  getWeeklyPaymentAmount,
 } from '../src/utils/paymentUtils.js';
 
 const referenceDate = new Date('2026-09-14T12:00:00');
@@ -51,4 +53,26 @@ test('weekly lesson payment status distinguishes paid and overdue weeks', () => 
 
   assert.equal(getLessonPaymentStatus(student, { date: '2026-09-14' }, referenceDate), 'paid');
   assert.equal(getLessonPaymentStatus(student, { date: '2026-09-07' }, referenceDate), 'overdue');
+});
+
+test('monthly receipt amount comes from the paid history, not the current monthly fee', () => {
+  const student = {
+    monthly_payment: 300,
+    payment_history: [
+      { month: '9', year: '2026', status: 'paid', amount: 220 },
+    ],
+  };
+
+  assert.equal(getMonthlyPaymentAmount(student, 9, 2026), 220);
+});
+
+test('weekly receipt amount comes from the paid history, not the current per-lesson fee', () => {
+  const student = {
+    weekly_payment: 110,
+    payment_history: [
+      { period: 'week', week_start: '2026-09-14', status: 'paid', amount: 85 },
+    ],
+  };
+
+  assert.equal(getWeeklyPaymentAmount(student, '2026-09-14'), 85);
 });

@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getNextPaymentDate, getPaymentStatus } from "@/utils/paymentUtils";
+import {
+  getMonthlyPaymentAmount,
+  getNextPaymentDate,
+  getPaymentStatus,
+  getWeeklyPaymentAmount,
+} from "@/utils/paymentUtils";
 import { generateAutomaticLessons, deleteFutureLessons, getLessonDayOfWeek, rescheduleFutureLessons } from "@/utils/lessonUtils";
 import { getLocalDateString, parseLocalDate } from "@/utils/dateUtils";
 import { transactionService, receiptService } from "@/modules/finance/services/financeService";
@@ -227,8 +232,9 @@ export default function Students() {
   };
 
   const createReceiptForStudent = async (student, monthNumber, paymentDate = getLocalDateString(), paymentMethod = 'pix') => {
-    const amount = Number(student.monthly_payment || 0);
-    const monthLabel = new Date(new Date().getFullYear(), monthNumber - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const year = new Date().getFullYear();
+    const amount = getMonthlyPaymentAmount(student, monthNumber, year);
+    const monthLabel = new Date(year, monthNumber - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
     const receiptPayload = {
       receipt_number: `REC-${Date.now()}`,
@@ -347,7 +353,7 @@ export default function Students() {
       receipt_number: `REC-${Date.now()}`,
       student_id: student.id,
       student_name: student.full_name,
-      amount: Number(student.weekly_payment || 0),
+      amount: getWeeklyPaymentAmount(student, week.weekStart),
       description: `Aulas da semana de ${new Date(`${week.weekStart}T00:00:00`).toLocaleDateString('pt-BR')}`,
       payment_date: paymentDate,
       payment_method: paymentMethod,
