@@ -204,7 +204,7 @@ export function AuthProvider({ children }) {
     loadSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (isMounted) {
+      if (isMounted && event !== 'INITIAL_SESSION') {
         const nextUserId = nextSession?.user?.id ?? null;
         const userChanged = sessionUserId.current !== nextUserId;
         sessionUserId.current = nextUserId;
@@ -232,7 +232,7 @@ export function AuthProvider({ children }) {
         setIsLoadingAuth(false);
 
         // Token renewal and tab visibility changes must not blank the app.
-        if (userChanged && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        if (userChanged && event === 'SIGNED_IN') {
           setIsLoadingWorkspaces(true);
           setTimeout(() => {
             if (!isMounted) return;

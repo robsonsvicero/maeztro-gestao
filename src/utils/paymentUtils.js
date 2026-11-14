@@ -1,4 +1,5 @@
 import { getLocalDateString, parseLocalDate } from './dateUtils.js';
+import { getNextLessonDate } from './lessonUtils.js';
 
 /**
  * Cria o calendar de parcelas mensais ausentes, com formato idempotente
@@ -51,7 +52,7 @@ export const getWeekStartKey = (value) => {
   return getLocalDateString(normalized);
 };
 
-export const buildWeeklyPaymentWeeks = (createdDate, referenceDate = new Date(), count = 12) => {
+export const buildWeeklyPaymentWeeks = (createdDate, referenceDate = new Date(), count = 12, lessonDay = '') => {
   const reference = new Date(referenceDate);
   const enrollmentDate = createdDate ? parseLocalDate(createdDate) : new Date(referenceDate);
   if (Number.isNaN(reference.getTime())) {
@@ -65,7 +66,8 @@ export const buildWeeklyPaymentWeeks = (createdDate, referenceDate = new Date(),
   }
 
   const currentWeek = parseLocalDate(getWeekStartKey(reference));
-  const firstWeek = parseLocalDate(getWeekStartKey(enrollmentDate));
+  const firstBillableDate = lessonDay ? getNextLessonDate(lessonDay, enrollmentDate) : enrollmentDate;
+  const firstWeek = parseLocalDate(getWeekStartKey(firstBillableDate));
   const start = firstWeek > currentWeek ? firstWeek : currentWeek;
 
   return Array.from({ length: count }, (_, index) => {

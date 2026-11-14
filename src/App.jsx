@@ -111,6 +111,7 @@ const AuthenticatedApp = () => {
   } = useAuth();
   const location = useLocation();
   const isPublicHome = location.pathname === '/';
+  const isWorkspaceInvite = location.pathname === '/workspace-invite';
 
   // The landing page must be visible without waiting for or requiring a session.
   // Authenticated visitors are handled normally once the session is known.
@@ -118,7 +119,7 @@ const AuthenticatedApp = () => {
     return <PublicHome />;
   }
 
-  if (isLoadingPublicSettings || isLoadingAuth || (isAuthenticated && isLoadingWorkspaces)) {
+  if (isLoadingPublicSettings || isLoadingAuth || (isAuthenticated && isLoadingWorkspaces && !isWorkspaceInvite)) {
     return <AppLoadingScreen />;
   }
 

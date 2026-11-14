@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.send-email]
 verify_jwt = false
 
+[functions.send-workspace-invitation]
+verify_jwt = true
+
 [functions.run-automations]
 verify_jwt = false
 

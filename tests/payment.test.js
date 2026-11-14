@@ -45,6 +45,13 @@ test('weekly payment view starts with the current week for existing students', (
   assert.deepEqual(weeks.map((week) => week.weekStart), ['2026-09-14', '2026-09-21']);
 });
 
+test('weekly payment view starts with the first lesson week for a Saturday enrollment', () => {
+  const enrollmentDate = new Date(2026, 10, 14, 12);
+  const weeks = buildWeeklyPaymentWeeks('2026-11-14', enrollmentDate, 2, 'segunda-feira');
+
+  assert.deepEqual(weeks.map((week) => week.weekStart), ['2026-11-16', '2026-11-23']);
+});
+
 test('weekly lesson payment status distinguishes paid and overdue weeks', () => {
   const student = {
     payment_type: 'weekly',

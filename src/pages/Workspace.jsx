@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { workspaceService } from '@/modules/workspaces/services/workspaceService';
 
 const roleLabels = {
@@ -28,6 +29,7 @@ export default function Workspace() {
     workspaceRole,
     refreshWorkspaces,
   } = useAuth();
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
   const isOwner = workspaceRole === 'owner';
   const [workspaceName, setWorkspaceName] = useState(activeWorkspace?.workspace_name || '');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -81,7 +83,21 @@ export default function Workspace() {
       setInviteEmail('');
       setInviteLink(`${window.location.origin}/workspace-invite?token=${encodeURIComponent(invitation.token)}`);
       await refreshWorkspaceData();
-      toast.success('Convite criado. Copie e envie o link para a pessoa convidada.');
+      setIsSendingInvitation(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('send-workspace-invitation', {
+          body: { workspace_id: activeWorkspaceId, token: invitation.token },
+        });
+        if (error) throw error;
+        if (!data?.success) {
+          throw new Error(data?.error || 'O serviço não confirmou o envio do convite.');
+        }
+        toast.success('Convite enviado por e-mail.');
+      } catch (error) {
+        toast.error(`Convite criado, mas o e-mail não foi enviado: ${error.message || 'erro desconhecido'}. O link continua disponível para cópia.`);
+      } finally {
+        setIsSendingInvitation(false);
+      }
     },
     onError: (error) => toast.error(error.message || 'Não foi possível criar o convite.'),
   });
@@ -230,14 +246,14 @@ export default function Workspace() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" className="self-end" disabled={createInvitationMutation.isPending}>
+                <Button type="submit" className="self-end" disabled={createInvitationMutation.isPending || isSendingInvitation}>
                   <UserPlus className="h-4 w-4" />
-                  Convidar
+                  {isSendingInvitation ? 'Enviando...' : 'Convidar'}
                 </Button>
               </form>
 
               <p className="text-sm text-slate-500">
-                O convite vale por 7 dias e só pode ser aceito por uma conta com o mesmo e-mail. Os limites de membros e workspaces são definidos pelo plano.
+                O convite será enviado por e-mail, vale por 7 dias e só pode ser aceito por uma conta com o mesmo endereço. Os limites de membros e workspaces são definidos pelo plano.
               </p>
 
               {inviteLink && (

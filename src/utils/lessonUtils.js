@@ -45,6 +45,19 @@ export const getLessonDayOfWeek = (lessonDay) => {
   return dayMap[normalizedDay];
 };
 
+export const getNextLessonDate = (lessonDay, referenceDate = new Date()) => {
+  const targetDayOfWeek = getLessonDayOfWeek(lessonDay);
+  if (targetDayOfWeek === undefined) {
+    throw new Error('Dia da aula inválido para o agendamento automático.');
+  }
+
+  const firstLessonDate = new Date(referenceDate);
+  firstLessonDate.setHours(0, 0, 0, 0);
+  const daysUntilNextOccurrence = (targetDayOfWeek - firstLessonDate.getDay() + 7) % 7;
+  firstLessonDate.setDate(firstLessonDate.getDate() + (daysUntilNextOccurrence || 7));
+  return firstLessonDate;
+};
+
 /**
  * Constrói o bloco determinístico de 52 aulas futuras.
  * Mantém a regra de idempotência: o método não grava; apenas
@@ -55,15 +68,7 @@ export const buildLessonWindowForStudent = (student, referenceDate = new Date(),
     return [];
   }
 
-  const targetDayOfWeek = getLessonDayOfWeek(student.lesson_day);
-  if (targetDayOfWeek === undefined) {
-    throw new Error('Dia da aula inválido para o agendamento automático.');
-  }
-
-  const firstLessonDate = new Date(referenceDate);
-  firstLessonDate.setHours(0, 0, 0, 0);
-  const daysUntilNextOccurrence = (targetDayOfWeek - firstLessonDate.getDay() + 7) % 7;
-  firstLessonDate.setDate(firstLessonDate.getDate() + (daysUntilNextOccurrence || 7));
+  const firstLessonDate = getNextLessonDate(student.lesson_day, referenceDate);
 
   const duration = Number(durationMinutes) || 60;
 

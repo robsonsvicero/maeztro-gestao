@@ -13,8 +13,8 @@ export default function StudentWeeklyFeesView({ student, onBack, onPay, onGenera
   const [weeks, setWeeks] = useState([]);
 
   useEffect(() => {
-    setWeeks(buildWeeklyPaymentWeeks(student.created_date));
-  }, [student.created_date]);
+    setWeeks(buildWeeklyPaymentWeeks(student.created_date, new Date(), 12, student.lesson_day));
+  }, [student.created_date, student.lesson_day]);
 
   const paymentHistory = Array.isArray(student.payment_history) ? student.payment_history : [];
   const openPaymentModal = (week) => {
