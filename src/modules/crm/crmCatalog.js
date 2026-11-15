@@ -8,6 +8,7 @@ export const CRM_STAGES = [
 ];
 
 export const CRM_SOURCES = [
+  'Google',
   'Indicação',
   'Instagram',
   'WhatsApp',
