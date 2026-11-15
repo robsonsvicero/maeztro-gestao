@@ -36,43 +36,43 @@ export default function MonthlyChart({ transactions }) {
 
   return (
     <Card className={`shadow-xl ${
-      isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+      isDark ? 'bg-[#142b42] border-[#31516e]' : 'bg-white border-slate-200'
     }`}>
-      <CardHeader className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+      <CardHeader className={`border-b ${isDark ? 'border-[#31516e]' : 'border-slate-200'}`}>
         <CardTitle className={`flex items-center gap-2 ${
-          isDark ? 'text-slate-100' : 'text-slate-900'
+          isDark ? 'text-sky-50' : 'text-slate-900'
         }`}>
-          <TrendingUp className="w-5 h-5 text-[#094C7E]" />
+          <TrendingUp className={`w-5 h-5 ${isDark ? 'text-sky-300' : 'text-[#094C7E]'}`} />
           Fluxo de Caixa Mensal
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#64748b' : '#cbd5e1'} />
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#31516e' : '#cbd5e1'} />
             <XAxis 
               dataKey="day" 
-              stroke={isDark ? '#cbd5e1' : '#475569'}
+              stroke={isDark ? '#bfdbfe' : '#475569'}
               style={{ fontSize: '12px' }}
             />
             <YAxis 
-              stroke={isDark ? '#cbd5e1' : '#475569'}
+              stroke={isDark ? '#bfdbfe' : '#475569'}
               style={{ fontSize: '12px' }}
               tickFormatter={(value) => `R$ ${value}`}
             />
             <Tooltip 
               contentStyle={{
-                backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                border: isDark ? '1px solid #64748b' : '1px solid #cbd5e1',
+                backgroundColor: isDark ? '#0b1726' : '#ffffff',
+                border: isDark ? '1px solid #31516e' : '1px solid #cbd5e1',
                 borderRadius: '8px',
                 backdropFilter: 'blur(10px)',
-                color: isDark ? '#f8fafc' : '#0f172a'
+                color: isDark ? '#f0f9ff' : '#0f172a'
               }}
               formatter={(value) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             />
-            <Legend wrapperStyle={{ color: isDark ? '#f8fafc' : '#334155' }} />
-            <Bar dataKey="Receitas" fill="#10b981" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="Despesas" fill="#ef4444" radius={[8, 8, 0, 0]} />
+            <Legend wrapperStyle={{ color: isDark ? '#e0f2fe' : '#334155' }} />
+            <Bar dataKey="Receitas" fill={isDark ? '#34d399' : '#10b981'} radius={[8, 8, 0, 0]} />
+            <Bar dataKey="Despesas" fill={isDark ? '#fb7185' : '#ef4444'} radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

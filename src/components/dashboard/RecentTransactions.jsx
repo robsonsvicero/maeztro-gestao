@@ -30,11 +30,11 @@ export default function RecentTransactions({ transactions, isLoading }) {
   if (isLoading) {
     return (
       <Card className={`backdrop-blur-xl shadow-xl ${
-        isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+        isDark ? 'bg-[#142b42] border-[#31516e]' : 'bg-white border-slate-200'
       }`}>
-        <CardHeader className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b ${isDark ? 'border-[#31516e]' : 'border-slate-200'}`}>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#094C7E]" />
+            <Clock className={`w-5 h-5 ${isDark ? 'text-sky-300' : 'text-[#094C7E]'}`} />
             Transações Recentes
           </CardTitle>
         </CardHeader>
@@ -52,20 +52,20 @@ export default function RecentTransactions({ transactions, isLoading }) {
 
   return (
     <Card className={`backdrop-blur-xl shadow-xl ${
-      isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+      isDark ? 'bg-[#142b42] border-[#31516e]' : 'bg-white border-slate-200'
     }`}>
-      <CardHeader className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+      <CardHeader className={`border-b ${isDark ? 'border-[#31516e]' : 'border-slate-200'}`}>
         <CardTitle className={`flex items-center gap-2 ${
-          isDark ? 'text-slate-100' : 'text-slate-900'
+          isDark ? 'text-sky-50' : 'text-slate-900'
         }`}>
-          <Clock className="w-5 h-5 text-[#094C7E]" />
+          <Clock className={`w-5 h-5 ${isDark ? 'text-sky-300' : 'text-[#094C7E]'}`} />
           Transações Recentes
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
         <div className="space-y-4">
           {transactions.length === 0 ? (
-            <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-center py-8 ${isDark ? 'text-sky-100/80' : 'text-slate-500'}`}>
               Nenhuma transação registrada
             </p>
           ) : (
@@ -74,38 +74,40 @@ export default function RecentTransactions({ transactions, isLoading }) {
                 key={transaction.id} 
                 className={`flex items-center justify-between py-4 border-b last:border-0 rounded-lg px-3 transition-colors ${
                     isDark
-                    ? 'border-slate-700 hover:bg-slate-700/50' 
+                  ? 'border-[#294968] hover:bg-[#1b3550]'
                     : 'border-slate-100 hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-4">
                   <div className={`p-2 rounded-xl ${
                     transaction.type === 'income' 
-                      ? 'bg-green-100' 
-                      : 'bg-red-100'
+                      ? isDark ? 'bg-emerald-950/70' : 'bg-green-100'
+                      : isDark ? 'bg-rose-950/70' : 'bg-red-100'
                   }`}>
                     {transaction.type === 'income' ? (
-                      <ArrowUpRight className="w-5 h-5 text-green-600" />
+                      <ArrowUpRight className={`w-5 h-5 ${isDark ? 'text-emerald-300' : 'text-green-600'}`} />
                     ) : (
-                      <ArrowDownRight className="w-5 h-5 text-red-600" />
+                      <ArrowDownRight className={`w-5 h-5 ${isDark ? 'text-rose-300' : 'text-red-600'}`} />
                     )}
                   </div>
                   <div>
-                    <p className={`font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    <p className={`font-semibold ${isDark ? 'text-sky-50' : 'text-slate-900'}`}>
                       {transaction.description}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs dark:border-sky-800 dark:text-sky-100">
                         {categoryLabels[transaction.category] || transaction.category || "Sem categoria"}
                       </Badge>
-                      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className={`text-xs ${isDark ? 'text-sky-100/80' : 'text-slate-500'}`}>
                         {format(new Date(transaction.date), "d 'de' MMMM", { locale: ptBR })}
                       </span>
                     </div>
                   </div>
                 </div>
                 <p className={`text-lg font-bold ${
-                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                  transaction.type === 'income'
+                    ? isDark ? 'text-emerald-300' : 'text-green-600'
+                    : isDark ? 'text-rose-300' : 'text-red-600'
                 }`}>
                   {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>

@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/ThemeContext";
 
-export default function StatCard({ title, value, icon: Icon, iconColor, bgGradient, trend }) {
+export default function StatCard({ title, value, icon: Icon, iconColor, darkIconColor = iconColor, bgGradient, trend }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   return (
@@ -14,7 +14,7 @@ export default function StatCard({ title, value, icon: Icon, iconColor, bgGradie
     >
       <Card className={`h-full border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden relative ${
         isDark
-          ? 'bg-slate-800 border border-slate-600'
+          ? 'bg-[#142b42] border border-[#31516e]'
           : `bg-gradient-to-br ${bgGradient}`
       }`}>
         <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-8 -translate-y-8 opacity-10">
@@ -23,22 +23,22 @@ export default function StatCard({ title, value, icon: Icon, iconColor, bgGradie
         <CardContent className="p-6 relative z-10">
           <div className="flex items-start justify-between mb-4">
             <p className={`text-sm font-medium ${
-              isDark ? 'text-slate-300' : 'text-slate-600'
+              isDark ? 'text-sky-100/80' : 'text-slate-600'
             }`}>{title}</p>
             <div className={`p-2 rounded-lg ${
-              isDark ? 'bg-slate-700' : 'bg-white/50'
+              isDark ? 'bg-[#1e3b58]' : 'bg-white/50'
             } backdrop-blur-sm`}>
-              <Icon className={`w-5 h-5 ${iconColor}`} />
+              <Icon className={`w-5 h-5 ${isDark ? darkIconColor : iconColor}`} />
             </div>
           </div>
           <p className={`text-2xl md:text-3xl font-bold mb-1 ${
-            isDark ? 'text-slate-100' : 'text-slate-900'
+            isDark ? 'text-sky-50' : 'text-slate-900'
           }`}>
             {value}
           </p>
           {trend && (
             <p className={`text-xs ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
+              isDark ? 'text-sky-100/80' : 'text-slate-600'
             }`}>{trend}</p>
           )}
         </CardContent>

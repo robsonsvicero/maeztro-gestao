@@ -43,16 +43,16 @@ const displayDate = (value) => {
 
 function DashboardSection({ title, description, actionHref, actionLabel, children, className = '' }) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 ${className}`}>
+    <section className={`rounded-xl border border-slate-200 bg-white p-5 dark:border-[#294968] dark:bg-[#101f33] ${className}`}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-          {description && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{description}</p>}
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-sky-50">{title}</h2>
+          {description && <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/80">{description}</p>}
         </div>
         {actionHref && (
           <Link
             to={createPageUrl(actionHref)}
-            className="text-sm font-medium text-[#094C7E] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-blue-300"
+            className="text-sm font-medium text-[#094C7E] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-sky-300"
           >
             {actionLabel}
           </Link>
@@ -65,30 +65,30 @@ function DashboardSection({ title, description, actionHref, actionLabel, childre
 
 function SummaryMeasure({ label, value, detail, icon: Icon }) {
   return (
-    <div className="min-w-0 border-b border-slate-200 py-4 first:pt-0 last:border-0 dark:border-slate-700 sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-0 sm:last:pr-0">
-      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-        <Icon className="h-4 w-4 shrink-0 text-[#094C7E] dark:text-blue-300" aria-hidden="true" />
+    <div className="min-w-0 border-b border-slate-200 py-4 first:pt-0 last:border-0 dark:border-[#294968] sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-0 sm:last:pr-0">
+      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-sky-100/80">
+        <Icon className="h-4 w-4 shrink-0 text-[#094C7E] dark:text-sky-300" aria-hidden="true" />
         <span>{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{value}</p>
-      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{detail}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950 dark:text-sky-50">{value}</p>
+      <p className="mt-1 text-xs text-slate-600 dark:text-sky-100/80">{detail}</p>
     </div>
   );
 }
 
 function InsightRow({ title, detail, status, href }) {
   return (
-    <li className="flex flex-col gap-2 border-b border-slate-100 py-3 last:border-0 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-2 border-b border-slate-100 py-3 last:border-0 dark:border-[#203a54] sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="truncate font-medium text-slate-900 dark:text-slate-100">{title}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-300">{detail}</p>
+        <p className="truncate font-medium text-slate-900 dark:text-sky-50">{title}</p>
+        <p className="text-sm text-slate-600 dark:text-sky-100/80">{detail}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        {status && <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{status}</span>}
+        {status && <span className="text-sm font-medium text-slate-700 dark:text-sky-100">{status}</span>}
         {href && (
           <Link
             to={createPageUrl(href)}
-            className="text-sm font-medium text-[#094C7E] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-blue-300"
+            className="text-sm font-medium text-[#094C7E] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-sky-300"
           >
             Abrir
           </Link>
@@ -297,8 +297,8 @@ export default function Dashboard() {
     <main className="space-y-6 p-4 md:p-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-950 dark:text-white">Inteligência de Gestão</h1>
-          <p className="mt-1 text-slate-600 dark:text-slate-300">
+          <h1 className="text-3xl font-bold text-slate-950 dark:text-sky-50">Inteligência de Gestão</h1>
+          <p className="mt-1 text-slate-600 dark:text-sky-100/80">
             Decisões operacionais com dados do estúdio · próximos {FORECAST_DAYS} dias
           </p>
         </div>
@@ -317,7 +317,7 @@ export default function Dashboard() {
       </header>
 
       {errors.length > 0 ? (
-        <section role="alert" className="rounded-xl border border-red-300 bg-red-50 p-5 text-red-950 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+        <section role="alert" className="rounded-xl border border-red-300 bg-red-50 p-5 text-red-950 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-100">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div className="space-y-2">
@@ -340,15 +340,15 @@ export default function Dashboard() {
         </section>
       ) : isLoading ? (
         <div aria-label="Carregando inteligência de gestão" className="space-y-4">
-          <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-sky-950/60" />
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-            <div className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+            <div className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-sky-950/60" />
+            <div className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-sky-950/60" />
           </div>
         </div>
       ) : (
         <>
-          <section aria-label="Resumo operacional" className="rounded-xl border border-slate-200 bg-white px-5 dark:border-slate-700 dark:bg-slate-900">
+          <section aria-label="Resumo operacional" className="rounded-xl border border-slate-200 bg-white px-5 dark:border-[#294968] dark:bg-[#101f33]">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4">
               <SummaryMeasure
                 label="Atenção hoje"
@@ -383,7 +383,7 @@ export default function Dashboard() {
               description="Cobranças atrasadas ou para hoje, retornos, interessados sem contato e encerramentos próximos."
             >
               {attentionItems.length === 0 ? (
-                <p className="py-4 text-sm text-slate-600 dark:text-slate-300">Nenhuma ação urgente identificada para hoje.</p>
+                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Nenhuma ação urgente identificada para hoje.</p>
               ) : (
                 <ul>
                   {attentionItems.slice(0, 7).map((item) => (
@@ -392,7 +392,7 @@ export default function Dashboard() {
                 </ul>
               )}
               {attentionItems.length > 7 && (
-                <p className="pt-3 text-sm text-slate-600 dark:text-slate-300">
+                <p className="pt-3 text-sm text-slate-600 dark:text-sky-100/80">
                   Mais {attentionItems.length - 7} itens também precisam de atenção.
                 </p>
               )}
@@ -405,7 +405,7 @@ export default function Dashboard() {
               actionLabel="Abrir alunos"
             >
               {intelligence.pendingCharges.length === 0 ? (
-                <p className="py-4 text-sm text-slate-600 dark:text-slate-300">Nenhuma cobrança em aberto neste período.</p>
+                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Nenhuma cobrança em aberto neste período.</p>
               ) : (
                 <ul>
                   {intelligence.pendingCharges.slice(0, 6).map((charge) => (
@@ -427,11 +427,11 @@ export default function Dashboard() {
               actionHref="Finances"
               actionLabel="Ver finanças"
             >
-              <p className="mb-3 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">
+              <p className="mb-3 text-2xl font-semibold tabular-nums text-slate-950 dark:text-sky-50">
                 {currency(intelligence.forecastAmount)}
               </p>
               {intelligence.forecastCharges.length === 0 ? (
-                <p className="py-3 text-sm text-slate-600 dark:text-slate-300">Nenhum recebimento previsto com os dados atuais.</p>
+                <p className="py-3 text-sm text-slate-600 dark:text-sky-100/80">Nenhum recebimento previsto com os dados atuais.</p>
               ) : (
                 <ul>
                   {intelligence.forecastCharges.slice(0, 6).map((charge) => (
@@ -453,20 +453,20 @@ export default function Dashboard() {
               actionHref={accountType === 'studio' ? 'Automations' : 'Settings'}
               actionLabel={accountType === 'studio' ? 'Configurar equipe' : 'Configurar horários'}
             >
-              <div className="mb-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="mb-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-[#172d44] dark:text-sky-100">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#094C7E] dark:text-sky-300" />
                 <p>{accountType === 'studio'
                   ? 'A estimativa combina o funcionamento do estúdio com os horários individuais e os compromissos de cada professor.'
                   : 'A estimativa usa os horários configurados pelo professor em Configurações e considera os compromissos deste professor.'}</p>
               </div>
               {!intelligence.teacherAvailability.configured ? (
-                <p className="py-3 text-sm text-slate-600 dark:text-slate-300">
+                <p className="py-3 text-sm text-slate-600 dark:text-sky-100/80">
                   {accountType === 'studio'
                     ? 'Configure o funcionamento na página Estúdio e a disponibilidade dos professores em Automações.'
                     : 'Configure seus horários disponíveis em Configurações para estimar a disponibilidade.'}
                 </p>
               ) : intelligence.teacherAvailability.availableTeachers.length === 0 ? (
-                <p className="py-3 text-sm text-slate-600 dark:text-slate-300">Nenhum professor tem horário livre nesta grade e período.</p>
+                <p className="py-3 text-sm text-slate-600 dark:text-sky-100/80">Nenhum professor tem horário livre nesta grade e período.</p>
               ) : (
                 <ul>
                   {intelligence.teacherAvailability.availableTeachers.map((teacher) => (
@@ -490,7 +490,7 @@ export default function Dashboard() {
               actionLabel="Abrir CRM"
             >
               {intelligence.leadsWithoutContact.length === 0 ? (
-                <p className="py-4 text-sm text-slate-600 dark:text-slate-300">Todos os interessados abertos têm ao menos um contato registrado.</p>
+                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Todos os interessados abertos têm ao menos um contato registrado.</p>
               ) : (
                 <ul>
                   {intelligence.leadsWithoutContact.slice(0, 6).map((lead) => (
@@ -513,7 +513,7 @@ export default function Dashboard() {
               actionLabel="Ver alunos"
             >
               {intelligence.endingStudents.length === 0 ? (
-                <p className="py-4 text-sm text-slate-600 dark:text-slate-300">Nenhum encerramento previsto neste período.</p>
+                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Nenhum encerramento previsto neste período.</p>
               ) : (
                 <ul>
                   {intelligence.endingStudents.slice(0, 6).map((student) => (
@@ -533,13 +533,13 @@ export default function Dashboard() {
       )}
 
       {errors.length > 0 ? null : isLoading ? (
-        <div aria-label="Carregando resumo financeiro" className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div aria-label="Carregando resumo financeiro" className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-sky-950/60" />
       ) : (
         <>
           <section className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Resumo financeiro do mês</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <h2 className="text-xl font-semibold text-slate-950 dark:text-sky-50">Resumo financeiro do mês</h2>
+              <p className="text-sm text-slate-600 dark:text-sky-100/80">
                 {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
               </p>
             </div>
@@ -549,6 +549,7 @@ export default function Dashboard() {
                 value={currency(monthIncome)}
                 icon={ArrowUpRight}
                 iconColor="text-green-600"
+                darkIconColor="text-emerald-300"
                 bgGradient="from-green-50 to-emerald-50"
                 trend={`${monthTransactions.filter((transaction) => transaction.type === 'income').length} entradas`}
               />
@@ -557,6 +558,7 @@ export default function Dashboard() {
                 value={currency(monthExpenses)}
                 icon={ArrowDownRight}
                 iconColor="text-red-600"
+                darkIconColor="text-rose-300"
                 bgGradient="from-red-50 to-rose-50"
                 trend={`${monthTransactions.filter((transaction) => transaction.type === 'expense').length} saídas`}
               />
@@ -565,6 +567,7 @@ export default function Dashboard() {
                 value={currency(monthBalance)}
                 icon={Wallet}
                 iconColor="text-[#094C7E]"
+                darkIconColor="text-sky-300"
                 bgGradient="from-blue-50 to-cyan-50"
                 trend={monthBalance >= 0 ? 'Positivo' : 'Negativo'}
               />
@@ -573,6 +576,7 @@ export default function Dashboard() {
                 value={activeStudents.length}
                 icon={Users}
                 iconColor="text-[#094C7E]"
+                darkIconColor="text-sky-300"
                 bgGradient="from-slate-50 to-slate-100"
                 trend="Total cadastrados"
               />
