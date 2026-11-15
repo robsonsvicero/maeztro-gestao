@@ -318,7 +318,8 @@ select
   'Aula experimental'::text as title,
   trial_date as date,
   start_time,
-  end_time
+  end_time,
+  teacher_user_id
 from public.crm_trials
 where (
   public.workspace_has_permission(workspace_id, 'crm.read')

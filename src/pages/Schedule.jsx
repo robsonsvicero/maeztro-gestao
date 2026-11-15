@@ -62,12 +62,17 @@ export default function Schedule() {
     queryFn: () => automationService.listAssignableMembers(),
     enabled: Boolean(activeWorkspaceId),
   });
+  const teacherNames = new Map(teachers.map((teacher) => [teacher.user_id, teacher.full_name]));
 
   const crmTrialEventsQuery = useQuery({
     queryKey: ['crmScheduleTrials', activeWorkspaceId],
     queryFn: () => crmTrialService.listForSchedule(),
     enabled: Boolean(activeWorkspaceId),
   });
+  const trialEvents = (crmTrialEventsQuery.data || []).map((event) => ({
+    ...event,
+    teacher_name: teacherNames.get(event.teacher_user_id) || 'Professor não definido',
+  }));
 
   const today = new Date();
   const selectedLocalDate = [
@@ -80,7 +85,7 @@ export default function Schedule() {
     String(today.getMonth() + 1).padStart(2, '0'),
     String(today.getDate()).padStart(2, '0'),
   ].join('-');
-  const visibleTrialEvents = (crmTrialEventsQuery.data || []).filter((event) => (
+  const visibleTrialEvents = trialEvents.filter((event) => (
     view === 'list'
       ? event.date >= todayLocalDate
       : event.date === selectedLocalDate
@@ -103,11 +108,10 @@ export default function Schedule() {
 
   const lessonsWithPaymentStatus = lessons.map((lesson) => {
     const student = students.find((item) => item.id === lesson.student_id);
-    if (!student) return lesson;
-
     return {
       ...lesson,
-      payment_status: getLessonPaymentStatus(student, lesson),
+      teacher_name: teacherNames.get(lesson.teacher_user_id) || 'Professor não definido',
+      ...(student ? { payment_status: getLessonPaymentStatus(student, lesson) } : {}),
     };
   });
 
@@ -262,6 +266,7 @@ export default function Schedule() {
         <TabsContent value="calendar" className="mt-6">
           <CalendarView
             lessons={lessonsWithPaymentStatus}
+            trialEvents={trialEvents}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
             onLessonClick={handleEdit}
@@ -274,6 +279,7 @@ export default function Schedule() {
         <TabsContent value="day" className="mt-6">
           <DayView
             lessons={lessonsWithPaymentStatus}
+            trialEvents={trialEvents}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
             onLessonClick={handleEdit}
@@ -305,7 +311,7 @@ export default function Schedule() {
             Tentar novamente
           </Button>
         </section>
-      ) : visibleTrialEvents.length > 0 && (
+      ) : view === 'list' && visibleTrialEvents.length > 0 && (
         <section aria-label={view === 'list' ? 'Próximas aulas experimentais' : 'Aulas experimentais do dia'} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-3 flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-[#094C7E] dark:text-blue-300" />
@@ -319,6 +325,7 @@ export default function Schedule() {
                 <div>
                   <p className="font-medium text-slate-900 dark:text-slate-100">{event.title}</p>
                   {view === 'list' && <p className="text-sm text-slate-600 dark:text-slate-300">{new Date(`${event.date}T12:00:00`).toLocaleDateString('pt-BR')}</p>}
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{event.teacher_name}</p>
                 </div>
                 <span className="tabular-nums text-sm text-slate-600 dark:text-slate-300">
                   {event.start_time?.slice(0, 5)}–{event.end_time?.slice(0, 5)}

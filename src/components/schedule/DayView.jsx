@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Plus, Sparkles, Music2, MapPin, CalendarDays
 import { format, addDays, subDays, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { getTrialScheduleEventsForDate } from "@/modules/crm/trialEventUtils";
 
 const dayKeyMap = {
   0: "sunday",
@@ -45,7 +46,7 @@ const formatMinutesToTime = (totalMinutes) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
-export default function DayView({ lessons, selectedDate, onDateChange, onLessonClick, onDeleteLesson: _onDeleteLesson, onStatusChange: _onStatusChange, onLessonUpdate, onNewLesson, appSettings, isLoading }) {
+export default function DayView({ lessons, trialEvents = [], selectedDate, onDateChange, onLessonClick, onDeleteLesson: _onDeleteLesson, onStatusChange: _onStatusChange, onLessonUpdate, onNewLesson, appSettings, isLoading }) {
   const dayKey = dayKeyMap[selectedDate.getDay()];
   const availableHours = appSettings?.available_hours?.[dayKey] || [];
 
@@ -80,14 +81,19 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
     [lessons, selectedDate]
   );
 
+  const dayTrialEvents = useMemo(
+    () => getTrialScheduleEventsForDate(trialEvents, selectedDate),
+    [trialEvents, selectedDate],
+  );
+
   // Timed lessons (have a start_time within the timeline range)
   const timedLessons = useMemo(() =>
-    dayLessons.filter(l => {
-      if (!l.start_time) return false;
-      const min = timeToMinutes(l.start_time);
-      return min >= startHour * 60 && min < endHour * 60 && l.status !== "cancelled";
+    [...dayLessons, ...dayTrialEvents].filter((lesson) => {
+      if (!lesson.start_time) return false;
+      const min = timeToMinutes(lesson.start_time);
+      return min >= startHour * 60 && min < endHour * 60 && lesson.status !== "cancelled";
     }),
-    [dayLessons, startHour, endHour]
+    [dayLessons, dayTrialEvents, startHour, endHour]
   );
 
   // Distribui aulas simultâneas em colunas para que seus blocos não se sobreponham.
@@ -297,7 +303,8 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                 })()}
 
                 {/* Lesson blocks */}
-                {positionedLessons.map(({ lesson, start, end, column, columnCount }, idx) => {
+                {positionedLessons.map(({ lesson, start, end, column, columnCount }) => {
+                  const isTrial = lesson.isTrial === true;
                   const top = ((start - startHour * 60) / 60) * HOUR_HEIGHT;
                   const height = Math.max(((end - start) / 60) * HOUR_HEIGHT - 3, 28);
                   const status = statusConfig[lesson.status] || statusConfig.scheduled;
@@ -306,9 +313,9 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                   return (
                     <motion.div
                       key={`${lesson.id}-${lesson.start_time}-${lesson.status}`}
-                      drag
-                      dragSnapToOrigin
-                      onDragEnd={(event, info) => {
+                      drag={!isTrial}
+                      dragSnapToOrigin={!isTrial}
+                      onDragEnd={isTrial ? undefined : (event, info) => {
                         const unscheduledContainer = document.getElementById('unscheduled-container');
                         if (unscheduledContainer) {
                            const rect = unscheduledContainer.getBoundingClientRect();
@@ -345,7 +352,11 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                           }
                         }
                       }}
-                      className={`absolute rounded-lg border-l-4 ${status.border} bg-white dark:bg-slate-700 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden z-20 ${
+                      className={`absolute rounded-lg border-l-4 ${
+                        isTrial
+                          ? 'border-violet-500 bg-violet-50 dark:border-violet-300 dark:bg-violet-950/60'
+                          : `${status.border} bg-white dark:bg-slate-700`
+                      } shadow-sm hover:shadow-md transition-all ${isTrial ? 'cursor-default' : 'cursor-pointer'} overflow-hidden z-20 ${
                         lesson.status === "cancelled" ? "opacity-50" : ""
                       }`}
                       style={{
@@ -353,9 +364,9 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                         height,
                         left: `${column * columnWidth}%`,
                         width: `${columnWidth}%`,
-                        touchAction: "none"
+                        touchAction: isTrial ? "auto" : "none"
                       }}
-                      onClick={(e) => {
+                      onClick={isTrial ? undefined : (e) => {
                         if (e.defaultPrevented) return;
                         onLessonClick(lesson);
                       }}
@@ -363,14 +374,17 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                       <div className="px-3 py-1.5 h-full flex flex-col justify-start pointer-events-none">
                         <div className="flex items-center gap-1.5">
                           <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
-                            {lesson.student_name}
+                            {isTrial ? 'Aula experimental' : lesson.student_name}
                           </h4>
-                          <Badge className={`${status.class} text-[10px] px-1.5 py-0 h-4`}>
-                            {status.label}
+                          <Badge className={`${isTrial ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-100' : status.class} text-[10px] px-1.5 py-0 h-4`}>
+                            {isTrial ? 'Experimental' : status.label}
                           </Badge>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {lesson.start_time} - {lesson.end_time} · {lesson.instrument}
+                          {lesson.start_time} - {lesson.end_time} · {isTrial ? 'Horário reservado' : lesson.instrument}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
+                          Professor: {lesson.teacher_name || 'Professor não definido'}
                         </p>
                         {height > 60 && (
                           <div className="flex flex-wrap gap-2 mt-1 text-[10px] text-slate-400 dark:text-slate-500">
@@ -438,7 +452,7 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
             </p>
           ) : (
             <div className="space-y-2">
-              {unscheduledLessons.map((lesson, idx) => {
+              {unscheduledLessons.map((lesson) => {
                 const status = statusConfig[lesson.status] || statusConfig.scheduled;
                 return (
                   <motion.div
@@ -486,6 +500,9 @@ export default function DayView({ lessons, selectedDate, onDateChange, onLessonC
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           {lesson.instrument}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          Professor: {lesson.teacher_name || 'Professor não definido'}
                         </p>
                       </div>
                     </div>

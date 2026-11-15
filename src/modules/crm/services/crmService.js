@@ -59,7 +59,7 @@ export const crmTrialService = {
   },
   listForSchedule: async () => {
     const { data, error } = await supabase.from('crm_public_trial_events')
-      .select('id,workspace_id,title,date,start_time,end_time')
+      .select('id,workspace_id,title,date,start_time,end_time,teacher_user_id')
       .eq('workspace_id', requireWorkspaceId())
       .order('date', { ascending: true })
       .order('start_time', { ascending: true });

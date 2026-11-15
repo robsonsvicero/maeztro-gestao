@@ -53,6 +53,9 @@ export default function LessonCard({ lesson, onEdit, onDelete, onStatusChange, t
                 <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   {lesson.instrument}
                 </p>
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Professor: {lesson.teacher_name || 'Professor não definido'}
+                </p>
               </div>
               <div className="flex gap-2">
                 <Badge className={statusConfig[lesson.status]?.class}>

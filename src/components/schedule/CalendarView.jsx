@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Music2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getTrialScheduleEventsForDate } from "@/modules/crm/trialEventUtils";
 
 import LessonCard from "./LessonCard";
 
-export default function CalendarView({ lessons, selectedDate, onDateChange, onLessonClick, onDeleteLesson, onStatusChange, theme, isLoading: _isLoading }) {
+export default function CalendarView({ lessons, trialEvents = [], selectedDate, onDateChange, onLessonClick, onDeleteLesson, onStatusChange, theme, isLoading: _isLoading }) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
 
   const monthStart = startOfMonth(currentMonth);
@@ -20,6 +21,10 @@ export default function CalendarView({ lessons, selectedDate, onDateChange, onLe
       return lessonDate && isSameDay(new Date(`${lessonDate}T00:00:00`), day);
     });
   };
+
+  const getEventCountForDay = (day) => (
+    getLessonsForDay(day).length + getTrialScheduleEventsForDate(trialEvents, day).length
+  );
 
   const handlePreviousMonth = () => {
     setCurrentMonth(subMonths(currentMonth, 1));
@@ -34,6 +39,19 @@ export default function CalendarView({ lessons, selectedDate, onDateChange, onLe
     setCurrentMonth(today);
     onDateChange(today);
   };
+
+  const selectedDayEvents = [
+    ...getLessonsForDay(selectedDate).map((lesson) => ({
+      type: 'lesson',
+      time: lesson.start_time || '23:59',
+      lesson,
+    })),
+    ...getTrialScheduleEventsForDate(trialEvents, selectedDate).map((event) => ({
+      type: 'trial',
+      time: event.start_time || '23:59',
+      event,
+    })),
+  ].sort((first, second) => first.time.localeCompare(second.time));
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -90,7 +108,7 @@ export default function CalendarView({ lessons, selectedDate, onDateChange, onLe
 
             {/* Days of the month */}
             {daysInMonth.map((day) => {
-              const dayLessons = getLessonsForDay(day);
+              const eventCount = getEventCountForDay(day);
               const isToday = isSameDay(day, new Date());
               const isSelected = isSameDay(day, selectedDate);
 
@@ -115,14 +133,14 @@ export default function CalendarView({ lessons, selectedDate, onDateChange, onLe
                   }`}>
                     {format(day, 'd')}
                   </div>
-                  {dayLessons.length > 0 && (
+                  {eventCount > 0 && (
                     <div className="flex justify-center">
                       <div className={`text-xs px-1 rounded ${
                         isSelected 
                           ? 'bg-white/20 text-white' 
                           : 'bg-[#094C7E] text-white'
                       }`}>
-                        {dayLessons.length}
+                        {eventCount}
                       </div>
                     </div>
                   )}
@@ -144,28 +162,35 @@ export default function CalendarView({ lessons, selectedDate, onDateChange, onLe
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          {getLessonsForDay(selectedDate).length === 0 ? (
+          {selectedDayEvents.length === 0 ? (
             <p className={`text-center py-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
               Nenhuma aula agendada para este dia
             </p>
           ) : (
             <div className="space-y-4">
-              {getLessonsForDay(selectedDate)
-                .sort((a, b) => {
-                  const aTime = a.start_time || '23:59';
-                  const bTime = b.start_time || '23:59';
-                  return aTime.localeCompare(bTime);
-                })
-                .map((lesson) => (
-                  <LessonCard
-                    key={lesson.id}
-                    lesson={lesson}
-                    onEdit={() => onLessonClick(lesson)}
-                    onDelete={() => onDeleteLesson?.(lesson.id)}
-                    onStatusChange={onStatusChange}
-                    theme={theme}
-                  />
-                ))}
+              {selectedDayEvents.map((entry) => entry.type === 'trial' ? (
+                <div
+                  key={entry.event.id}
+                  className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-800 dark:bg-violet-950/40"
+                >
+                  <p className="font-semibold text-violet-900 dark:text-violet-100">Aula experimental</p>
+                  <p className="mt-1 text-sm text-violet-800 dark:text-violet-200">
+                    {entry.event.start_time}–{entry.event.end_time} · Horário reservado
+                  </p>
+                  <p className="text-sm text-violet-800 dark:text-violet-200">
+                    Professor: {entry.event.teacher_name || 'Professor não definido'}
+                  </p>
+                </div>
+              ) : (
+                <LessonCard
+                  key={entry.lesson.id}
+                  lesson={entry.lesson}
+                  onEdit={() => onLessonClick(entry.lesson)}
+                  onDelete={() => onDeleteLesson?.(entry.lesson.id)}
+                  onStatusChange={onStatusChange}
+                  theme={theme}
+                />
+              ))}
             </div>
           )}
         </CardContent>
