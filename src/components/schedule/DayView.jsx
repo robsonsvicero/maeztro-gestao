@@ -381,10 +381,7 @@ export default function DayView({ lessons, trialEvents = [], selectedDate, onDat
                           </Badge>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {lesson.start_time} - {lesson.end_time} · {isTrial ? 'Horário reservado' : lesson.instrument}
-                        </p>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
-                          Professor: {lesson.teacher_name || 'Professor não definido'}
+                          {lesson.start_time} - {lesson.end_time} · {isTrial ? 'Horário reservado' : lesson.instrument} · Professor: {lesson.teacher_name || 'Professor não definido'}
                         </p>
                         {height > 60 && (
                           <div className="flex flex-wrap gap-2 mt-1 text-[10px] text-slate-400 dark:text-slate-500">

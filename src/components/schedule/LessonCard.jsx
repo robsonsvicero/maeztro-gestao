@@ -50,12 +50,6 @@ export default function LessonCard({ lesson, onEdit, onDelete, onStatusChange, t
                 }`}>
                   {lesson.student_name}
                 </h3>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {lesson.instrument}
-                </p>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Professor: {lesson.teacher_name || 'Professor não definido'}
-                </p>
               </div>
               <div className="flex gap-2">
                 <Badge className={statusConfig[lesson.status]?.class}>
@@ -82,7 +76,7 @@ export default function LessonCard({ lesson, onEdit, onDelete, onStatusChange, t
                 theme === 'dark' ? 'text-slate-300' : 'text-slate-600'
               }`}>
                 <Clock className="w-4 h-4" />
-                {lesson.start_time} - {lesson.end_time || '—'} ({lesson.duration || 60}min)
+                {lesson.start_time} - {lesson.end_time || '—'} ({lesson.duration || 60}min) · {lesson.instrument} · Professor: {lesson.teacher_name || 'Professor não definido'}
               </div>
               {lesson.location && (
                 <div className={`flex items-center gap-2 ${
