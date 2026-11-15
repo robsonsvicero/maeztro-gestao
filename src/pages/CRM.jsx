@@ -82,6 +82,9 @@ function LeadForm({ lead, isSaving, onCancel, onSubmit }) {
   }));
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const sourceOptions = form.source && !CRM_SOURCES.includes(form.source)
+    ? [form.source, ...CRM_SOURCES]
+    : CRM_SOURCES;
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -114,10 +117,12 @@ function LeadForm({ lead, isSaving, onCancel, onSubmit }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="lead-source">Origem do contato</Label>
-          <Input id="lead-source" list="crm-source-options" value={form.source} onChange={(event) => update('source', event.target.value)} placeholder="Ex.: indicação, Instagram" />
-          <datalist id="crm-source-options">
-            {CRM_SOURCES.map((source) => <option key={source} value={source} />)}
-          </datalist>
+          <Select value={form.source} onValueChange={(value) => update('source', value)}>
+            <SelectTrigger id="lead-source"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {sourceOptions.map((source) => <SelectItem key={source} value={source}>{source}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="lead-instrument">Instrumento de interesse</Label>

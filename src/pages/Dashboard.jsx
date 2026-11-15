@@ -120,7 +120,7 @@ export default function Dashboard() {
     enabled: Boolean(activeWorkspaceId),
   });
   const leadsQuery = useQuery({
-    queryKey: ['crm', activeWorkspaceId],
+    queryKey: ['dashboardCrmLeads', activeWorkspaceId],
     queryFn: () => crmLeadService.list(),
     enabled: Boolean(activeWorkspaceId),
   });
@@ -145,7 +145,7 @@ export default function Dashboard() {
     enabled: Boolean(activeWorkspaceId && accountType === 'studio'),
   });
   const appSettingsQuery = useQuery({
-    queryKey: ['appSettings'],
+    queryKey: ['dashboardAppSettings', activeWorkspaceId],
     queryFn: () => appSettingsService.list(),
     enabled: Boolean(activeWorkspaceId && accountType === 'individual'),
   });
@@ -276,7 +276,7 @@ export default function Dashboard() {
     ['crmTrials', activeWorkspaceId],
     ...(accountType === 'studio'
       ? [['studioAvailability', activeWorkspaceId], ['teacherAvailability', activeWorkspaceId]]
-      : [['appSettings']]),
+      : [['dashboardAppSettings', activeWorkspaceId]]),
     ['workspaceTeachers', activeWorkspaceId],
   ];
   const refresh = () => {
