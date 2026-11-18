@@ -65,7 +65,7 @@ function DashboardSection({ title, description, actionHref, actionLabel, childre
 
 function SummaryMeasure({ label, value, detail, icon: Icon }) {
   return (
-    <div className="min-w-0 border-b border-slate-200 py-4 first:pt-0 last:border-0 dark:border-[#294968] sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-0 sm:last:pr-0">
+    <div className="min-w-0 border-b border-slate-200 py-4 last:border-0 dark:border-[#294968] sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-0 sm:last:pr-0">
       <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-sky-100/80">
         <Icon className="h-4 w-4 shrink-0 text-[#094C7E] dark:text-sky-300" aria-hidden="true" />
         <span>{label}</span>
