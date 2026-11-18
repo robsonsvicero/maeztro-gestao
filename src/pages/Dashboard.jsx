@@ -223,6 +223,8 @@ export default function Dashboard() {
   const activeStudents = students.filter(
     (student) => student.student_status !== 'inactive' && student.student_state !== 'archived',
   );
+  const overdueCharges = intelligence.pendingCharges.filter((charge) => charge.status === 'overdue');
+  const overdueChargeAmount = overdueCharges.reduce((total, charge) => total + charge.amount, 0);
 
   const attentionItems = [
     ...intelligence.pendingCharges
@@ -357,9 +359,9 @@ export default function Dashboard() {
                 icon={AlertTriangle}
               />
               <SummaryMeasure
-                label="Cobranças pendentes"
-                value={intelligence.pendingChargeCount}
-                detail={currency(intelligence.pendingChargeAmount)}
+                label="Cobranças vencidas"
+                value={overdueCharges.length}
+                detail={currency(overdueChargeAmount)}
                 icon={Wallet}
               />
               <SummaryMeasure
@@ -399,20 +401,20 @@ export default function Dashboard() {
             </DashboardSection>
 
             <DashboardSection
-              title="Cobranças pendentes"
-              description={`Vencidas ou com vencimento nos próximos ${FORECAST_DAYS} dias.`}
+              title="Cobranças vencidas"
+              description="Somente cobranças com vencimento anterior a hoje."
               actionHref="Students"
               actionLabel="Abrir alunos"
             >
-              {intelligence.pendingCharges.length === 0 ? (
-                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Nenhuma cobrança em aberto neste período.</p>
+              {overdueCharges.length === 0 ? (
+                <p className="py-4 text-sm text-slate-600 dark:text-sky-100/80">Nenhuma cobrança vencida.</p>
               ) : (
                 <ul>
-                  {intelligence.pendingCharges.slice(0, 6).map((charge) => (
+                  {overdueCharges.slice(0, 6).map((charge) => (
                     <InsightRow
                       key={charge.key}
                       title={charge.studentName}
-                      detail={`${charge.label} · ${charge.weekStart ? `semana de ${displayDate(charge.weekStart)}` : `vencimento ${displayDate(charge.date)}`}`}
+                      detail={`${charge.label} · vencida desde ${displayDate(charge.weekEnd || charge.date)}`}
                       status={currency(charge.amount)}
                       href="Students"
                     />
