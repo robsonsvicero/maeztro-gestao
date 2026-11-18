@@ -10,6 +10,7 @@ import { addMinutesToTime, slotFitsAvailability, WEEKDAY_BY_NAME } from "@/modul
 
 export default function StudentForm({
   student,
+  initialValues = {},
   onSubmit,
   onCancel,
   theme,
@@ -24,34 +25,41 @@ export default function StudentForm({
   isAvailabilityLoading = false,
   defaultLessonDuration = 60,
 }) {
-  const [formData, setFormData] = useState(student ? {
-    ...student,
-    teacher_user_id: student.teacher_user_id || (workspaceRole === 'teacher' ? currentUserId : null),
-  } : {
-    full_name: "",
-    birthday_day: "",
-    birthday_month: "",
-    address: "",
-    email: "",
-    phone: "",
-    parent_name: "",
-    parent_phone: "",
-    instrument: "",
-    level: "iniciante",
-    lesson_day: "",
-    lesson_time: "",
-    payment_type: "monthly",
-    monthly_payment: "",
-    weekly_payment: "",
-    payment_day: "",
-    payment_status: "pending",
-    student_status: "active",
-    student_state: "active",
-    teacher_user_id: workspaceRole === 'teacher' ? currentUserId : null,
-    last_payment_date: "",
-    next_payment_date: "",
-    expected_end_date: "",
-    notes: ""
+  const [formData, setFormData] = useState(() => {
+    if (student) {
+      return {
+        ...student,
+        teacher_user_id: student.teacher_user_id || (workspaceRole === 'teacher' ? currentUserId : null),
+      };
+    }
+
+    return {
+      full_name: "",
+      birthday_day: "",
+      birthday_month: "",
+      address: "",
+      email: "",
+      phone: "",
+      parent_name: "",
+      parent_phone: "",
+      instrument: "",
+      level: "iniciante",
+      lesson_day: "",
+      lesson_time: "",
+      payment_type: "monthly",
+      monthly_payment: "",
+      weekly_payment: "",
+      payment_day: "",
+      payment_status: "pending",
+      student_status: "active",
+      student_state: "active",
+      teacher_user_id: workspaceRole === 'teacher' ? currentUserId : null,
+      last_payment_date: "",
+      next_payment_date: "",
+      expected_end_date: "",
+      notes: "",
+      ...initialValues,
+    };
   });
 
   const [calculatedPaymentStatus, setCalculatedPaymentStatus] = useState(formData.payment_status || 'pending');

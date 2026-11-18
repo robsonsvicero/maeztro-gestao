@@ -25,6 +25,7 @@ import { Link } from 'react-router-dom';
 import { automationService } from '@/modules/automations/automationService';
 import { availabilityService } from '@/modules/availability/services/availabilityService';
 import { slotFitsAvailability } from '@/modules/availability/availabilityUtils';
+import { lessonService } from '@/modules/lessons/services/lessonService';
 import {
   CRM_CONTACT_CHANNELS,
   CRM_SOURCES,
@@ -38,11 +39,22 @@ import {
   crmLeadService,
   crmTrialService,
 } from '@/modules/crm/services/crmService';
+import { studentService } from '@/modules/students/services/studentService';
+import { appSettingsService } from '@/modules/settings/services/settingsService';
+import StudentForm from '@/components/students/StudentForm';
+import { generateAutomaticLessons } from '@/utils/lessonUtils';
 import { createPageUrl } from '@/utils';
 
 const crmQueryKey = (workspaceId) => ['crm', workspaceId];
 const scheduleTrialsQueryKey = (workspaceId) => ['crmScheduleTrials', workspaceId];
 const contactsQueryKey = (leadId) => ['crmLeadContacts', leadId];
+const leadChangesFromStudent = ({ full_name, phone, email, instrument, notes }) => ({
+  full_name,
+  phone,
+  email: email || null,
+  instrument,
+  notes: notes || null,
+});
 
 const localDate = (date = new Date()) => {
   const year = date.getFullYear();
@@ -414,15 +426,15 @@ function LeadDetails({
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-slate-100">Converter em aluno</h3>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              O sistema confere o telefone antes de vincular ou criar o cadastro.
+              Complete o cadastro do aluno. Os dados já informados aqui serão preenchidos automaticamente.
             </p>
           </div>
           {(!lead.phone || !lead.instrument) && (
-            <p className="text-sm text-amber-800 dark:text-amber-200">Informe telefone e instrumento no cadastro antes de converter.</p>
+            <p className="text-sm text-amber-800 dark:text-amber-200">Telefone e instrumento podem ser completados no formulário do aluno.</p>
           )}
           <div>
-            <Button type="button" onClick={() => onConvert(lead)} disabled={isConverting || !lead.phone || !lead.instrument}>
-              <ArrowRight className="mr-2 h-4 w-4" />{isConverting ? 'Verificando cadastro...' : 'Converter em aluno'}
+            <Button type="button" onClick={() => onConvert(lead)} disabled={isConverting}>
+              <ArrowRight className="mr-2 h-4 w-4" />Converter em aluno
             </Button>
           </div>
         </section>
@@ -528,7 +540,7 @@ function LeadDetails({
 }
 
 export default function CRM() {
-  const { activeWorkspaceId, workspaceRole, accountType } = useAuth();
+  const { activeWorkspaceId, workspaceRole, accountType, userId } = useAuth();
   const queryClient = useQueryClient();
   const [activeStage, setActiveStage] = useState('new_lead');
   const [search, setSearch] = useState('');
@@ -536,6 +548,7 @@ export default function CRM() {
   const [sheetMode, setSheetMode] = useState(null);
   const [activeLead, setActiveLead] = useState(null);
   const [conversionMatches, setConversionMatches] = useState(null);
+  const [conversionDraft, setConversionDraft] = useState(null);
 
   const crmQuery = useQuery({
     queryKey: crmQueryKey(activeWorkspaceId),
@@ -564,6 +577,11 @@ export default function CRM() {
     queryKey: ['teacherAvailability', activeWorkspaceId],
     queryFn: () => availabilityService.listTeachers(activeWorkspaceId),
     enabled: Boolean(activeWorkspaceId && workspaceRole === 'owner' && accountType === 'studio'),
+  });
+  const appSettingsQuery = useQuery({
+    queryKey: ['appSettings'],
+    queryFn: () => appSettingsService.list(),
+    enabled: Boolean(activeWorkspaceId && workspaceRole === 'owner'),
   });
 
   const contactsQuery = useQuery({
@@ -637,28 +655,100 @@ export default function CRM() {
   });
 
   const conversionMutation = useMutation({
-    mutationFn: ({ leadId, studentId, createNewDespiteMatches }) => convertCrmLead(
-      leadId,
-      studentId,
-      createNewDespiteMatches,
-    ),
+    mutationFn: async ({ leadId, studentId, createNewDespiteMatches, studentData }) => {
+      if (studentData) {
+        await crmLeadService.update(leadId, leadChangesFromStudent(studentData));
+      }
+
+      return convertCrmLead(leadId, studentId, createNewDespiteMatches);
+    },
     onSuccess: async (result, variables) => {
       if (result?.status === 'created' || result?.status === 'linked' || result?.status === 'already_converted') {
         await queryClient.invalidateQueries({ queryKey: crmQueryKey(activeWorkspaceId) });
         await queryClient.invalidateQueries({ queryKey: ['students'] });
         setActiveLead((current) => current?.id === variables.leadId ? {
           ...current,
+          ...(variables.studentData ? leadChangesFromStudent(variables.studentData) : {}),
           stage: 'enrolled',
           enrolled_student_id: result.student_id,
           enrolled_at: current.enrolled_at || new Date().toISOString(),
         } : current);
         toast.success(result.status === 'linked' ? 'Interessado vinculado ao aluno existente.' : 'Interessado convertido em aluno.');
         setConversionMatches(null);
+        setConversionDraft(null);
+        setSheetMode('view');
       } else if (result?.status === 'student_already_linked') {
         toast.error('Este cadastro de aluno já está vinculado a outro interessado.');
       }
     },
     onError: (error) => toast.error(error?.message || 'Não foi possível converter o interessado.'),
+  });
+
+  const saveLeadStudentMutation = useMutation({
+    mutationFn: async ({ lead, studentData }) => {
+      await crmLeadService.update(lead.id, leadChangesFromStudent(studentData));
+      const student = await studentService.create(studentData);
+      const result = await convertCrmLead(lead.id, student.id);
+
+      if (result?.status !== 'linked' && result?.status !== 'already_converted') {
+        throw new Error('O aluno foi salvo, mas não foi possível concluir o vínculo com o CRM.');
+      }
+
+      return { leadId: lead.id, student, result, studentData };
+    },
+    onSuccess: async ({ leadId, student, result, studentData }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: crmQueryKey(activeWorkspaceId) }),
+        queryClient.invalidateQueries({ queryKey: ['students'] }),
+      ]);
+      setActiveLead((current) => current?.id === leadId ? {
+        ...current,
+        ...leadChangesFromStudent(studentData),
+        stage: 'enrolled',
+        enrolled_student_id: result.student_id,
+        enrolled_at: current.enrolled_at || new Date().toISOString(),
+      } : current);
+      setConversionMatches(null);
+      setConversionDraft(null);
+      setSheetMode('view');
+
+      if (student.lesson_day && student.lesson_time && student.student_status === 'active') {
+        try {
+          const defaultDuration = Number(appSettingsQuery.data?.[0]?.default_lesson_duration) || 60;
+          const createdLessons = await generateAutomaticLessons(student, lessonService, defaultDuration);
+          await queryClient.invalidateQueries({ queryKey: ['lessons'] });
+          toast.success(`Interessado convertido e ${createdLessons.length} aulas agendadas automaticamente.`);
+        } catch (error) {
+          console.error('Erro ao agendar aulas após conversão do CRM:', error);
+          toast.error('Aluno salvo, mas houve erro ao agendar aulas.');
+        }
+      } else {
+        toast.success('Interessado convertido em aluno.');
+      }
+    },
+    onError: async (error, { studentData }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: crmQueryKey(activeWorkspaceId) }),
+        queryClient.invalidateQueries({ queryKey: ['students'] }),
+      ]);
+      setConversionMatches(null);
+      setConversionDraft(studentData);
+      toast.error(error?.message || 'Não foi possível salvar e converter o aluno.');
+    },
+  });
+
+  const checkStudentPhoneMutation = useMutation({
+    mutationFn: ({ studentData }) => studentService.findByPhone(studentData.phone),
+    onSuccess: (students, { lead, studentData }) => {
+      setConversionDraft(studentData);
+      if (students.length > 0) {
+        setConversionMatches({ lead, students, studentData });
+        return;
+      }
+
+      saveLeadStudentMutation.mutate({ lead, studentData });
+    },
+    onError: (error) => toast.error(error?.message || 'Não foi possível verificar se já existe um aluno com este telefone.'),
   });
 
   const visibleLeads = useMemo(() => {
@@ -683,11 +773,15 @@ export default function CRM() {
 
   const openNewLead = () => {
     setActiveLead(null);
+    setConversionDraft(null);
+    setConversionMatches(null);
     setSheetMode('create');
   };
 
   const openLead = (lead) => {
     setActiveLead(lead);
+    setConversionDraft(null);
+    setConversionMatches(null);
     setSheetMode('view');
   };
 
@@ -700,13 +794,10 @@ export default function CRM() {
   };
 
   const requestConversion = (lead) => {
-    conversionMutation.mutate({ leadId: lead.id }, {
-      onSuccess: (result) => {
-        if (result?.status === 'matches_required') {
-          setConversionMatches({ lead, students: result.matches || [] });
-        }
-      },
-    });
+    setActiveLead(lead);
+    setConversionDraft(null);
+    setConversionMatches(null);
+    setSheetMode('convert');
   };
 
   if (workspaceRole !== 'owner') {
@@ -878,15 +969,21 @@ export default function CRM() {
         if (!open) {
           setSheetMode(null);
           setConversionMatches(null);
+          setConversionDraft(null);
         }
       }}>
         <SheetContent side="right" className="w-full overflow-y-auto bg-white dark:bg-slate-900 sm:max-w-xl">
           <SheetHeader className="mb-6 pr-8 text-left">
             <SheetTitle>
-              {sheetMode === 'create' ? 'Novo interessado' : sheetMode === 'edit' ? 'Editar interessado' : activeLead?.full_name || 'Interessado'}
+              {sheetMode === 'create' ? 'Novo interessado'
+                : sheetMode === 'edit' ? 'Editar interessado'
+                  : sheetMode === 'convert' ? 'Cadastrar aluno'
+                    : activeLead?.full_name || 'Interessado'}
             </SheetTitle>
             <SheetDescription>
-              {sheetMode === 'view' ? 'Acompanhe etapa, contatos, aulas experimentais e matrícula.' : 'Os dados ficam visíveis somente para o proprietário.'}
+              {sheetMode === 'view' ? 'Acompanhe etapa, contatos, aulas experimentais e matrícula.'
+                : sheetMode === 'convert' ? 'Os dados do interessado já foram preenchidos. Complete o cadastro; verificaremos o telefone antes de salvar.'
+                  : 'Os dados ficam visíveis somente para o proprietário.'}
             </SheetDescription>
           </SheetHeader>
           {sheetMode === 'create' && (
@@ -904,6 +1001,87 @@ export default function CRM() {
               onCancel={() => setSheetMode('view')}
               onSubmit={handleSaveLead}
             />
+          )}
+          {sheetMode === 'convert' && activeLead && !conversionMatches && (
+            <StudentForm
+              key={activeLead.id}
+              initialValues={{
+                full_name: activeLead.full_name,
+                phone: activeLead.phone || '',
+                email: activeLead.email || '',
+                instrument: activeLead.instrument || '',
+                notes: activeLead.notes || '',
+                ...conversionDraft,
+              }}
+              isSubmitting={checkStudentPhoneMutation.isPending || saveLeadStudentMutation.isPending}
+              canEditFinancialFields={workspaceRole === 'owner'}
+              teachers={teachersQuery.data || []}
+              currentUserId={userId}
+              workspaceRole={workspaceRole}
+              accountType={accountType}
+              studioAvailability={studioAvailabilityQuery.data || []}
+              teacherAvailability={teacherAvailabilityQuery.data || []}
+              isAvailabilityLoading={studioAvailabilityQuery.isLoading || teacherAvailabilityQuery.isLoading}
+              defaultLessonDuration={Number(appSettingsQuery.data?.[0]?.default_lesson_duration) || 60}
+              onSubmit={(studentData) => checkStudentPhoneMutation.mutate({ lead: activeLead, studentData })}
+              onCancel={() => {
+                setConversionDraft(null);
+                setSheetMode('view');
+              }}
+            />
+          )}
+          {sheetMode === 'convert' && activeLead && conversionMatches && (
+            <section aria-labelledby="conversion-matches-title" className="space-y-4 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+              <div>
+                <h3 id="conversion-matches-title" className="font-semibold text-amber-950 dark:text-amber-100">Cadastro com este telefone encontrado</h3>
+                <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+                  Para evitar duplicidade, vincule o aluno existente. Vincular não altera os dados desse cadastro.
+                </p>
+              </div>
+              <ul className="divide-y divide-amber-200 rounded-lg border border-amber-200 dark:divide-amber-800 dark:border-amber-800">
+                {conversionMatches.students.map((student) => (
+                  <li key={student.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{student.full_name}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-300">{student.phone}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={conversionMutation.isPending || saveLeadStudentMutation.isPending}
+                      onClick={() => conversionMutation.mutate({
+                        leadId: conversionMatches.lead.id,
+                        studentId: student.id,
+                        studentData: conversionMatches.studentData,
+                      })}
+                    >
+                      Vincular
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConversionMatches(null)}
+                  disabled={conversionMutation.isPending || saveLeadStudentMutation.isPending}
+                >
+                  Voltar ao cadastro
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={conversionMutation.isPending || saveLeadStudentMutation.isPending}
+                  onClick={() => saveLeadStudentMutation.mutate({
+                    lead: conversionMatches.lead,
+                    studentData: conversionMatches.studentData,
+                  })}
+                >
+                  Criar novo cadastro mesmo assim
+                </Button>
+              </div>
+            </section>
           )}
           {sheetMode === 'view' && activeLead && (
                 <>
@@ -938,51 +1116,6 @@ export default function CRM() {
                 setSheetMode('edit');
               }}
             />
-            {conversionMatches && (
-              <section aria-labelledby="conversion-matches-title" className="mt-6 space-y-4 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-                <div>
-                  <h3 id="conversion-matches-title" className="font-semibold text-amber-950 dark:text-amber-100">Cadastro com este telefone encontrado</h3>
-                  <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
-                    Para evitar duplicidade, vincule o aluno existente. Se for outra pessoa, confirme antes de criar um novo cadastro.
-                  </p>
-                </div>
-                <ul className="divide-y divide-amber-200 rounded-lg border border-amber-200 dark:divide-amber-800 dark:border-amber-800">
-                  {conversionMatches.students.map((student) => (
-                    <li key={student.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{student.full_name}</p>
-                        <p className="text-sm text-slate-600 dark:text-slate-300">{student.phone}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={conversionMutation.isPending}
-                        onClick={() => conversionMutation.mutate({
-                          leadId: conversionMatches.lead.id,
-                          studentId: student.id,
-                        })}
-                      >
-                        Vincular
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                  <Button type="button" variant="outline" onClick={() => setConversionMatches(null)}>Revisar depois</Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={conversionMutation.isPending}
-                    onClick={() => conversionMutation.mutate({
-                      leadId: conversionMatches.lead.id,
-                      createNewDespiteMatches: true,
-                    })}
-                  >
-                    Criar novo cadastro mesmo assim
-                  </Button>
-                </div>
-              </section>
-            )}
             </>
           )}
         </SheetContent>
