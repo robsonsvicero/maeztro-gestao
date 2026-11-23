@@ -54,8 +54,83 @@ Ordem de implantação:
 5. Execute novamente `supabase/maintain_future_lessons.sql` para que a rotina agendada inclua o workspace, o professor e a presença pendente nas aulas criadas.
 6. Revise e aplique `supabase/crm.sql`. Ela exige as colunas da tabela `public.student` usadas pela conversão e interrompe a execução se encontrar uma incompatibilidade.
 7. Revise e aplique `supabase/intelligence.sql` para adicionar a data prevista de encerramento ao cadastro de alunos.
-8. Publique as Edge Functions atualizadas (`activate-access`, `sync-recurrence` e `run-automations`) e, por último, o frontend.
-9. Habilite `pg_net` (`create extension if not exists pg_net with schema extensions;`), configure `AUTOMATION_CRON_SECRET` nas secrets da Edge Function e armazene a URL do projeto e o mesmo token no Supabase Vault (`project_url` e `automation_cron_secret`). Crie um cron horário que invoque `run-automations` com `Authorization: Bearer <AUTOMATION_CRON_SECRET>` e `timeout_milliseconds := 30000`; o worker rejeita chamadas sem esse token. Não use uma chave de usuário no agendamento.
+8. Publique as Edge Functions pelo terminal:
+
+   - Abra o terminal do VS Code na raiz do repositório: a pasta que contém este `README.md` e a pasta `supabase/`. Não é necessário entrar em `supabase/functions/` nem em cada pasta da função.
+   - Instale a [Supabase CLI](https://supabase.com/docs/guides/cli) se ainda não estiver instalada e autentique-se:
+
+     ```bash
+     supabase login
+     ```
+
+   - No Dashboard do Supabase, abra o projeto correto e copie o **Project ID** em **Project Settings > General**. Vincule a raiz local a esse projeto (substitua o texto pelo Project ID real):
+
+     ```bash
+     supabase link --project-ref SEU_PROJECT_ID
+     ```
+
+     Faça o vínculo uma vez por cópia local do repositório. Antes de publicar, confirme que o Project ID é do ambiente desejado (produção ou teste).
+   - Ainda na raiz, publique as três funções:
+
+     ```bash
+     supabase functions deploy activate-access --no-verify-jwt
+     supabase functions deploy sync-recurrence --no-verify-jwt
+     supabase functions deploy run-automations --no-verify-jwt
+     ```
+
+     Os nomes são `activate-access` (não `active-access`), `sync-recurrence` e `run-automations`. Esses comandos enviam para o projeto vinculado o código que já está nas respectivas pastas em `supabase/functions/`; não é preciso fazer uma alteração no código para publicá-las pela primeira vez. Execute novamente o comando da função quando quiser publicar uma versão local atualizada. O workflow do GitHub apenas chama a `sync-recurrence` que já está publicada; não faz deploy. Depois, publique o frontend pelo processo de deploy do aplicativo.
+9. Configure e agende `run-automations`:
+
+   - Antes de tudo, em **Edge Functions > Secrets** no Dashboard do mesmo projeto, crie `AUTOMATION_CRON_SECRET` com um valor aleatório forte. Não coloque esse valor em arquivo do repositório, `.env.local` ou GitHub.
+   - No **Database > Vault** do mesmo projeto, crie os secrets `project_url` (com a URL do projeto, por exemplo `https://SEU_PROJECT_ID.supabase.co`) e `automation_cron_secret` (com exatamente o mesmo valor configurado para `AUTOMATION_CRON_SECRET`). Não crie duplicatas se esses nomes já existirem. A função rejeita chamadas cujo token `Bearer` não corresponda ao secret.
+   - Abra o **SQL Editor** do Dashboard e execute para habilitar as extensões:
+
+     ```sql
+     create extension if not exists pg_cron with schema extensions;
+     create extension if not exists pg_net with schema extensions;
+     ```
+
+   - Ainda no SQL Editor, execute o SQL abaixo. Ele remove um agendamento anterior com o mesmo nome e cria um job para executar no minuto zero de cada hora (UTC). Confirme que está no projeto certo antes de executar:
+
+     ```sql
+     select cron.unschedule(jobid)
+     from cron.job
+     where jobname = 'run-automations-hourly';
+
+     select cron.schedule(
+       'run-automations-hourly',
+       '0 * * * *',
+       $$
+       select net.http_post(
+         url := (
+           select decrypted_secret
+           from vault.decrypted_secrets
+           where name = 'project_url'
+         ) || '/functions/v1/run-automations',
+         headers := jsonb_build_object(
+           'Content-Type', 'application/json',
+           'Authorization', 'Bearer ' || (
+             select decrypted_secret
+             from vault.decrypted_secrets
+             where name = 'automation_cron_secret'
+           )
+         ),
+         body := '{}'::jsonb,
+         timeout_milliseconds := 30000
+       );
+       $$
+     );
+     ```
+
+   - Confira se o job está ativo:
+
+     ```sql
+     select jobid, schedule, active
+     from cron.job
+     where jobname = 'run-automations-hourly';
+     ```
+
+     Para conferir as execuções, consulte `cron.job_run_details` no Dashboard. O `timeout_milliseconds` limita a requisição HTTP a 30 segundos. Não use uma chave de usuário no agendamento.
 
 As automações desta fase geram somente avisos internos no painel; não enviam e-mail, WhatsApp ou mensagens aos alunos. O horário semanal padrão é segunda-feira às 8h de São Paulo. Regras sem dados necessários (por exemplo, ocupação sem horários cadastrados) ficam bloqueadas com o motivo registrado no histórico.
 
